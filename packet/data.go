@@ -105,36 +105,36 @@ func (p *DataPacket) Equal(other Packet) bool {
 	return p.PacketId == otherData.PacketId && reflect.DeepEqual(p.Payload, otherData.Payload)
 }
 func (p *DataPacket) encode() []byte {
-	buffer := NewBuffer([]byte{})
-	buffer.WriteUInt8(uint8(p.Qos))
-	buffer.WriteUInt8(uint8(p.DataType))
+	buffer := newBuffer([]byte{})
+	buffer.writeUInt8(uint8(p.Qos))
+	buffer.writeUInt8(uint8(p.DataType))
 	if p.Qos > 0 {
-		buffer.WriteInt64(p.PacketId)
+		buffer.writeInt64(p.PacketId)
 	}
-	buffer.WriteBytes(p.Payload)
-	return buffer.Bytes()
+	buffer.writeBytes(p.Payload)
+	return buffer.bytes()
 }
 
 func (p *DataPacket) decode(data []byte) error {
-	buffer := NewBuffer(data)
-	qos, err := buffer.ReadUInt8()
+	buffer := newBuffer(data)
+	qos, err := buffer.readUInt8()
 	if err != nil {
 		return err
 	}
-	dataType, err := buffer.ReadUInt8()
+	dataType, err := buffer.readUInt8()
 	if err != nil {
 		return err
 	}
 	p.Qos = DataQos(qos)
 	p.DataType = DataType(dataType)
 	if qos > 0 {
-		packetId, err := buffer.ReadInt64()
+		packetId, err := buffer.readInt64()
 		if err != nil {
 			return err
 		}
 		p.PacketId = packetId
 	}
-	payload, err := buffer.Read()
+	payload, err := buffer.readAll()
 	if err != nil {
 		return err
 	}
@@ -166,14 +166,14 @@ func (p *DataAckPacket) Equal(other Packet) bool {
 	return p.PacketId == otherAck.PacketId
 }
 func (p *DataAckPacket) encode() []byte {
-	buffer := NewBuffer([]byte{})
-	buffer.WriteInt64(p.PacketId)
-	return buffer.Bytes()
+	buffer := newBuffer([]byte{})
+	buffer.writeInt64(p.PacketId)
+	return buffer.bytes()
 }
 
 func (p *DataAckPacket) decode(data []byte) error {
-	buffer := NewBuffer(data)
-	packetId, err := buffer.ReadInt64()
+	buffer := newBuffer(data)
+	packetId, err := buffer.readInt64()
 	if err != nil {
 		return err
 	}

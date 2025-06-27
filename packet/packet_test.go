@@ -5,11 +5,11 @@ import (
 	"io"
 	"testing"
 
-	"sutext.github.io/entry/types"
+	"sutext.github.io/entry/code"
 )
 
 func TestPacket(t *testing.T) {
-	testp(t, Connect("user1", types.PlatformMobile, "token1"))
+	testp(t, Connect("user1", code.PlatformMobile, "token1"))
 	testp(t, Connack(0))
 	testp(t, SmallData())
 	testp(t, BigData())

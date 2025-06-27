@@ -1,16 +1,19 @@
 package client
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
 	"net"
 	"sync"
+	"time"
 
+	"sutext.github.io/entry/backoff"
+	"sutext.github.io/entry/code"
 	"sutext.github.io/entry/keepalive"
 	"sutext.github.io/entry/logger"
 	"sutext.github.io/entry/packet"
-	"sutext.github.io/entry/types"
 )
 
 var ErrNotConnected = errors.New("not connected")
@@ -20,24 +23,27 @@ type Identity struct {
 	AccessToken string
 }
 type Client struct {
-	mu        *sync.Mutex
-	conn      net.Conn
+	mu        *sync.RWMutex
+	conn      *conn
 	host      string
 	prot      string
 	status    Status
 	logger    *slog.Logger
+	retrier   *Retrier
 	identity  *Identity
-	platform  types.Platform
+	platform  code.Platform
+	retrying  bool
 	keepalive *keepalive.KeepAlive
 }
 
 func New(config *Config) *Client {
 	c := &Client{
-		mu:        new(sync.Mutex),
+		mu:        new(sync.RWMutex),
 		host:      config.Host,
 		prot:      config.Port,
 		status:    StatusUnknown,
 		logger:    logger.New(config.LoggerLevel, config.LoggerFormat),
+		retrier:   NewRetrier(100000, backoff.Constant(time.Second*2)),
 		platform:  config.Platform,
 		keepalive: keepalive.New(config.KeepAlive, config.PingTimeout),
 	}
@@ -46,48 +52,80 @@ func New(config *Config) *Client {
 	})
 	c.keepalive.TimeoutFunc(func() {
 		c.logger.Error("keepalive timeout")
-		go c.reconnect()
+		c.tryClose(CloseReasonPingTimeout)
 	})
 	return c
 }
+
 func (c *Client) Connect(userId string, accessToken string) {
 	c.identity = &Identity{
 		UserID:      userId,
 		AccessToken: accessToken,
 	}
-	go c.reconnect()
+	switch c.Status() {
+	case StatusOpened, StatusOpening:
+		return
+	}
+	c.setStatus(StatusOpening)
+	c.reconnect()
 }
-func (c *Client) reconnect() {
+func (c *Client) tryClose(err error) {
+	c.logger.Error("try close", "reason", err)
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	if c.identity == nil {
 		return
 	}
-	if c.Status() == StatusOpened || c.Status() == StatusOpening {
+	if c.status == StatusClosed || c.status == StatusClosing {
 		return
 	}
-	conn, err := net.Dial("tcp", net.JoinHostPort(c.host, c.prot))
-	if err != nil {
-		c.logger.Error(err.Error())
-		c.setStatus(StatusClosed)
+	if c.retrying {
 		return
 	}
-	c.conn = conn
-	c.setStatus(StatusOpening)
-	err = c.SendPacket(packet.Connect(c.identity.UserID, c.platform, c.identity.AccessToken))
-	if err != nil {
-		c.logger.Error(err.Error())
-		c.setStatus(StatusClosed)
-		return
-	}
-	for {
-		p, err := packet.ReadPacket(conn)
-		if err != nil {
-			c.logger.Error(err.Error())
+	if code, ok := err.(CloseReason); ok {
+		if code == CloseReasonNormal {
 			c.setStatus(StatusClosed)
 			return
 		}
-		c.handlePacket(p)
 	}
+	if c.retrier == nil {
+		c.setStatus(StatusClosed)
+		return
+	}
+	delay, ok := c.retrier.can(err)
+	if !ok {
+		c.setStatus(StatusClosed)
+		return
+	}
+	c.retrying = true
+	c.setStatus(StatusOpening)
+	c.logger.Info("will retry after", "delay", delay.String())
+	c.retrier.retry(delay, func() {
+		c.retrying = false
+		c.reconnect()
+	})
+
 }
+func (c *Client) reconnect() {
+	if c.conn != nil {
+		c.conn.close()
+		c.conn = nil
+	}
+	c.conn = &conn{}
+	c.conn.onPacket(func(p packet.Packet) {
+		c.handlePacket(context.Background(), p)
+	})
+	c.conn.onError(func(err error) {
+		c.tryClose(err)
+	})
+	err := c.conn.connect(net.JoinHostPort(c.host, c.prot))
+	if err != nil {
+		c.tryClose(err)
+		return
+	}
+	c.SendPacket(packet.Connect(c.identity.UserID, c.platform, c.identity.AccessToken))
+}
+
 func (c *Client) SendData(data []byte, packetId int64, dataType packet.DataType) error {
 	dataPacket := packet.Data(dataType, packetId, data)
 	return c.SendPacket(dataPacket)
@@ -112,6 +150,12 @@ func (c *Client) SendJSON(j any, packetId int64) error {
 	dataPacket := packet.Data(packet.DataTypeText, packetId, jsonData)
 	return c.SendPacket(dataPacket)
 }
+func (c *Client) SendPing() error {
+	return c.SendPacket(packet.Ping())
+}
+func (c *Client) SendPong() error {
+	return c.SendPacket(packet.Pong())
+}
 func (c *Client) SendJSON0(j any) error {
 	jsonData, err := json.Marshal(j)
 	if err != nil {
@@ -124,46 +168,54 @@ func (c *Client) SendPacket(p packet.Packet) error {
 	if c.conn == nil {
 		return ErrNotConnected
 	}
-	return packet.WritePacket(c.conn, p)
+	return c.conn.sendPacket(p)
 }
 func (c *Client) Status() Status {
-	c.mu.Lock()
-	defer c.mu.Unlock()
+	c.mu.RLock()
+	defer c.mu.RUnlock()
 	return c.status
 }
-func (c *Client) setStatus(status Status) {
+func (c *Client) safeSetStatus(status Status) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.setStatus(status)
+}
+func (c *Client) setStatus(status Status) {
 	if c.status == status {
 		return
 	}
+	c.logger.Info("status change", "from", c.status.String(), "to", status.String())
 	c.status = status
-	if status == StatusClosed {
+	switch status {
+	case StatusClosed:
+		c.keepalive.Stop()
+		c.retrier.cancel()
 		if c.conn != nil {
-			c.conn.Close()
+			c.conn.close()
 			c.conn = nil
 		}
+	case StatusOpening, StatusClosing:
 		c.keepalive.Stop()
-		go c.reconnect()
+	case StatusOpened:
+		c.keepalive.Start()
 	}
-	// c.NotifyStatus <- status
 }
-func (c *Client) handlePacket(p packet.Packet) {
+func (c *Client) handlePacket(ctx context.Context, p packet.Packet) {
 	c.logger.Info("receive packet", "packet", p.String())
 	switch p := p.(type) {
 	case *packet.ConnackPacket:
 		if p.Code != 0 {
-			c.logger.Error("connect failed")
+			return
 		}
-		c.setStatus(StatusOpened)
-		c.keepalive.Start()
+		c.safeSetStatus(StatusOpened)
 	case *packet.DataPacket:
+
 	case *packet.PingPacket:
-		c.SendPacket(packet.Pong())
+		c.SendPong()
 	case *packet.PongPacket:
 		c.keepalive.HandlePong()
 	case *packet.ClosePacket:
-		c.setStatus(StatusClosed)
+		c.tryClose(p.Code)
 	default:
 
 	}

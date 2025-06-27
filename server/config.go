@@ -1,13 +1,15 @@
 package server
 
 import (
+	"time"
+
 	"sutext.github.io/entry/logger"
 )
 
 type Config struct {
 	Port         string        `json:"port"`
-	KeepAlive    int64         `json:"keepalive"`
-	PingTimeout  int64         `json:"ping_timeout"`
+	KeepAlive    time.Duration `json:"keepalive"`
+	PingTimeout  time.Duration `json:"ping_timeout"`
 	LoggerLevel  logger.Level  `json:"logger_level"`
 	LoggerFormat logger.Format `json:"logger_format"`
 }

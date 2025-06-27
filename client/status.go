@@ -26,3 +26,30 @@ func (s Status) String() string {
 		return "Unknown"
 	}
 }
+
+type CloseReason uint16
+
+const (
+	CloseReasonNormal CloseReason = iota
+	CloseReasonPingTimeout
+	CloseReasonNetworkError
+	CloseReasonServerClose
+)
+
+func (c CloseReason) String() string {
+	switch c {
+	case CloseReasonNormal:
+		return "Normal"
+	case CloseReasonPingTimeout:
+		return "Ping Timeout"
+	case CloseReasonNetworkError:
+		return "Network Error"
+	case CloseReasonServerClose:
+		return "Server Close"
+	default:
+		return "Unknown"
+	}
+}
+func (c CloseReason) Error() string {
+	return c.String()
+}

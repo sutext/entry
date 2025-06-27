@@ -3,16 +3,16 @@ package packet
 import (
 	"fmt"
 
-	"sutext.github.io/entry/types"
+	"sutext.github.io/entry/code"
 )
 
 type ConnectPacket struct {
 	UserID      string
-	Platform    types.Platform
+	Platform    code.Platform
 	AccessToken string
 }
 
-func Connect(userID string, platfrom types.Platform, accessToken string) *ConnectPacket {
+func Connect(userID string, platfrom code.Platform, accessToken string) *ConnectPacket {
 	return &ConnectPacket{
 		UserID:      userID,
 		Platform:    platfrom,
@@ -37,54 +37,54 @@ func (p *ConnectPacket) Equal(other Packet) bool {
 	return p.Platform == otherP.Platform && p.UserID == otherP.UserID && p.AccessToken == otherP.AccessToken
 }
 func (p *ConnectPacket) encode() []byte {
-	buffer := NewBuffer([]byte{})
-	buffer.WriteString(p.UserID)
-	buffer.WriteUInt8(byte(p.Platform))
-	buffer.WriteString(p.AccessToken)
-	return buffer.Bytes()
+	buffer := newBuffer([]byte{})
+	buffer.writeString(p.UserID)
+	buffer.writeUInt8(byte(p.Platform))
+	buffer.writeString(p.AccessToken)
+	return buffer.bytes()
 }
 func (p *ConnectPacket) decode(data []byte) error {
-	buffer := NewBuffer(data)
-	userID, err := buffer.ReadString()
+	buffer := newBuffer(data)
+	userID, err := buffer.readString()
 	if err != nil {
 		return err
 	}
-	platform, err := buffer.ReadUInt8()
+	platform, err := buffer.readUInt8()
 	if err != nil {
 		return err
 	}
-	accessToken, err := buffer.ReadString()
+	accessToken, err := buffer.readString()
 	if err != nil {
 		return err
 	}
-	p.Platform = types.Platform(platform)
+	p.Platform = code.Platform(platform)
 	p.UserID = userID
 	p.AccessToken = accessToken
 	return nil
 }
 
-type ConnackCode uint16
+type ConnectCode uint16
 
 const (
 	// Connection Accepted
-	ConnectionAccepted ConnackCode = 0
-	// Unacceptable protocol version
-	UnacceptableProtocolVersion ConnackCode = 1
+	ConnectionAccepted ConnectCode = 0
+	// Connection Refused, unacceptable protocol version
+	AlreadyConnected ConnectCode = 1
 	// Identifier rejected
-	IdentifierRejected ConnackCode = 2
+	IdentifierRejected ConnectCode = 2
 	// Server unavailable
-	ServerUnavailable ConnackCode = 3
+	ServerUnavailable ConnectCode = 3
 	// Bad user name or password
-	BadUserNameOrPassword ConnackCode = 4
+	BadUserNameOrPassword ConnectCode = 4
 	// Not authorized
-	NotAuthorized ConnackCode = 5
+	NotAuthorized ConnectCode = 5
 )
 
 type ConnackPacket struct {
-	Code ConnackCode
+	Code ConnectCode
 }
 
-func Connack(code ConnackCode) *ConnackPacket {
+func Connack(code ConnectCode) *ConnackPacket {
 	return &ConnackPacket{
 		Code: code,
 	}
@@ -96,9 +96,9 @@ func (P *ConnackPacket) Type() PacketType {
 	return CONNACK
 }
 func (p *ConnackPacket) encode() []byte {
-	buffer := NewBuffer([]byte{})
-	buffer.WriteUInt16(uint16(p.Code))
-	return buffer.Bytes()
+	buffer := newBuffer([]byte{})
+	buffer.writeUInt16(uint16(p.Code))
+	return buffer.bytes()
 }
 func (p *ConnackPacket) Equal(other Packet) bool {
 	if other == nil {
@@ -111,11 +111,11 @@ func (p *ConnackPacket) Equal(other Packet) bool {
 	return p.Code == otherP.Code
 }
 func (p *ConnackPacket) decode(data []byte) error {
-	buffer := NewBuffer(data)
-	code, err := buffer.ReadUInt16()
+	buffer := newBuffer(data)
+	code, err := buffer.readUInt16()
 	if err != nil {
 		return err
 	}
-	p.Code = ConnackCode(code)
+	p.Code = ConnectCode(code)
 	return nil
 }

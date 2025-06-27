@@ -14,10 +14,10 @@ func main() {
 	ctx := context.Background()
 	s := server.New(config)
 
-	s.HandleLogin(func(ctx context.Context, conn *server.Conn, p packet.ConnectPacket) error {
+	s.HandleLogin(func(ctx context.Context, conn *server.Conn, p *packet.ConnectPacket) error {
 		return nil
 	})
-	s.HandleData(func(ctx context.Context, conn *server.Conn, p packet.DataPacket) error {
+	s.HandleData(func(ctx context.Context, conn *server.Conn, p *packet.DataPacket) error {
 		return nil
 	})
 	s.Run(ctx)

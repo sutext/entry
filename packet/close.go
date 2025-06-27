@@ -5,21 +5,56 @@ import "fmt"
 type CloseCode uint16
 
 const (
-	CloseNormal             CloseCode = 1000
-	CloseGoingAway          CloseCode = 1001
-	CloseProtocolError      CloseCode = 1002
-	CloseUnsupported        CloseCode = 1003
-	CloseNoStatus           CloseCode = 1005
-	CloseAbnormalClosure    CloseCode = 1006
-	CloseInvalidFrame       CloseCode = 1007
-	ClosePolicyViolation    CloseCode = 1008
-	CloseMessageTooBig      CloseCode = 1009
-	CloseMandatoryExtension CloseCode = 1010
-	CloseInternalError      CloseCode = 1011
-	CloseServiceRestart     CloseCode = 1012
-	CloseTryAgainLater      CloseCode = 1013
-	CloseTLSHandshake       CloseCode = 1015
+	CloseNormal                CloseCode = 1000
+	CloseGoingAway             CloseCode = 1001
+	CloseAlreayLogined         CloseCode = 1002
+	CloseUnsupported           CloseCode = 1003
+	CloseNoStatus              CloseCode = 1004
+	CloseInvalidFrame          CloseCode = 1005
+	CloseMessageTooBig         CloseCode = 1006
+	CloseInternalError         CloseCode = 1007
+	CloseServiceRestart        CloseCode = 1008
+	CloseDuplicateLogin        CloseCode = 1009
+	CloseAuthenticationFailure CloseCode = 1010
+	CloseAuthenticationTimeout CloseCode = 1011
+	CloseKickedOut             CloseCode = 1012
 )
+
+func (c CloseCode) String() string {
+	switch c {
+	case CloseNormal:
+		return "Normal"
+	case CloseGoingAway:
+		return "Going Away"
+	case CloseAlreayLogined:
+		return "Already Logined"
+	case CloseUnsupported:
+		return "Unsupported"
+	case CloseNoStatus:
+		return "No Status"
+	case CloseInvalidFrame:
+		return "Invalid Frame"
+	case CloseMessageTooBig:
+		return "Message Too Big"
+	case CloseInternalError:
+		return "Internal Error"
+	case CloseServiceRestart:
+		return "Service Restart"
+	case CloseDuplicateLogin:
+		return "Duplicate Login"
+	case CloseAuthenticationFailure:
+		return "Authentication Failure"
+	case CloseAuthenticationTimeout:
+		return "Authentication Timeout"
+	case CloseKickedOut:
+		return "Kicked Out"
+	default:
+		return "Unknown"
+	}
+}
+func (c CloseCode) Error() string {
+	return c.String()
+}
 
 type ClosePacket struct {
 	Code CloseCode
@@ -45,14 +80,14 @@ func (p *ClosePacket) Equal(other Packet) bool {
 	return p.Code == otherClose.Code
 }
 func (p *ClosePacket) encode() []byte {
-	buffer := NewBuffer([]byte{})
-	buffer.WriteUInt16(uint16(p.Code))
-	return buffer.Bytes()
+	buffer := newBuffer([]byte{})
+	buffer.writeUInt16(uint16(p.Code))
+	return buffer.bytes()
 }
 
 func (p *ClosePacket) decode(data []byte) error {
-	buffer := NewBuffer(data)
-	code, err := buffer.ReadUInt16()
+	buffer := newBuffer(data)
+	code, err := buffer.readUInt16()
 	if err != nil {
 		return err
 	}

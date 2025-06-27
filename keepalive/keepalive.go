@@ -1,65 +1,80 @@
 package keepalive
 
-import "time"
+import (
+	"sync"
+	"time"
+)
 
 type KeepAlive struct {
-	interval    int64
-	timeout     int64
-	timer       *time.Timer
+	mu          *sync.Mutex
+	interval    time.Duration
+	timeout     time.Duration
 	sendFunc    func()
 	timeoutFunc func()
 	stop        chan struct{}
 	pong        chan struct{}
 }
 
-func New(interval int64, timeout int64) *KeepAlive {
+func New(interval time.Duration, timeout time.Duration) *KeepAlive {
 	return &KeepAlive{
+		mu:       new(sync.Mutex),
 		interval: interval,
 		timeout:  timeout,
-		timer:    time.NewTimer(0),
-		stop:     make(chan struct{}),
-		pong:     make(chan struct{}),
 	}
 }
 func (k *KeepAlive) Start() {
-	timer := time.NewTimer(time.Duration(k.interval) * time.Second)
+	k.mu.Lock()
+	k.stop = make(chan struct{})
+	k.mu.Unlock()
 	go func() {
+		timer := time.NewTimer(k.interval * time.Second)
 		for {
 			select {
 			case <-k.stop:
 				timer.Stop()
 				return
 			case <-timer.C:
-				k.sendPing()
-				timer.Reset(time.Duration(k.interval) * time.Second)
+				go k.sendPing()
+				timer.Reset(k.interval * time.Second)
 			}
 		}
 	}()
 }
 func (k *KeepAlive) Stop() {
-	k.stop <- struct{}{}
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	if k.stop != nil {
+		close(k.stop)
+		k.stop = nil
+	}
 }
 func (k *KeepAlive) PingFunc(f func()) {
 	k.sendFunc = f
 }
 func (k *KeepAlive) HandlePong() {
-	k.pong <- struct{}{}
+	k.mu.Lock()
+	defer k.mu.Unlock()
+	if k.pong != nil {
+		close(k.pong)
+		k.pong = nil
+	}
 }
 func (k *KeepAlive) TimeoutFunc(f func()) {
 	k.timeoutFunc = f
 }
 func (k *KeepAlive) sendPing() {
+	k.mu.Lock()
+	k.pong = make(chan struct{})
+	k.mu.Unlock()
 	k.sendFunc()
-	k.timer.Stop()
-	k.timer.Reset(time.Duration(k.timeout) * time.Second)
-	go func() {
-		select {
-		case <-k.timer.C:
-			k.timeoutFunc()
-		case <-k.stop:
-			return
-		case <-k.pong:
-			return
-		}
-	}()
+	timer := time.NewTimer(k.timeout * time.Second)
+	defer timer.Stop()
+	select {
+	case <-k.stop:
+		return
+	case <-k.pong:
+		return
+	case <-timer.C:
+		k.timeoutFunc()
+	}
 }
