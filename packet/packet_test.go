@@ -4,12 +4,11 @@ import (
 	"fmt"
 	"io"
 	"testing"
-
-	"sutext.github.io/entry/code"
 )
 
 func TestPacket(t *testing.T) {
-	testp(t, Connect("user1", code.PlatformMobile, "token1"))
+	identity := Identity{}
+	testp(t, Connect(&identity))
 	testp(t, Connack(0))
 	testp(t, SmallData())
 	testp(t, BigData())

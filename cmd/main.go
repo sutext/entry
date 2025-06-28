@@ -14,7 +14,7 @@ func main() {
 	ctx := context.Background()
 	s := server.New(config)
 
-	s.HandleLogin(func(ctx context.Context, conn *server.Conn, p *packet.ConnectPacket) error {
+	s.HandleLogin(func(ctx context.Context, conn *server.Conn, p *packet.Identity) error {
 		return nil
 	})
 	s.HandleData(func(ctx context.Context, conn *server.Conn, p *packet.DataPacket) error {

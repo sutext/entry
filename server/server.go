@@ -7,22 +7,20 @@ import (
 	"net"
 	"os"
 	"os/signal"
-	"sync"
 	"syscall"
 	"time"
 
-	"sutext.github.io/entry/code"
 	"sutext.github.io/entry/logger"
 	"sutext.github.io/entry/packet"
+	"sutext.github.io/entry/safe"
 )
 
 type DataHandler func(ctx context.Context, conn *Conn, p *packet.DataPacket) error
-type LoginHandler func(ctx context.Context, conn *Conn, p *packet.ConnectPacket) error
-type ConnMap map[code.Platform]*Conn
-
+type LoginHandler func(ctx context.Context, conn *Conn, p *packet.Identity) error
 type Server struct {
-	mu           *sync.RWMutex
-	conns        map[string]ConnMap
+	subs         *safe.Map[string, []*Conn]
+	conns        *safe.Map[string, *Conn]
+	peers        *safe.Map[string, *peer]
 	config       *Config
 	logger       *slog.Logger
 	dataHandler  DataHandler
@@ -31,11 +29,12 @@ type Server struct {
 
 func New(config *Config) *Server {
 	s := &Server{
-		mu:     &sync.RWMutex{},
-		conns:  make(map[string]ConnMap),
+		subs:   safe.NewMap(map[string][]*Conn{}),
+		conns:  safe.NewMap(map[string]*Conn{}),
+		peers:  safe.NewMap(map[string]*peer{}),
 		config: config,
 		logger: logger.New(config.LoggerLevel, config.LoggerFormat),
-		loginHandler: func(ctx context.Context, conn *Conn, p *packet.ConnectPacket) error {
+		loginHandler: func(ctx context.Context, conn *Conn, p *packet.Identity) error {
 			return fmt.Errorf("login handler not set")
 		},
 		dataHandler: func(ctx context.Context, conn *Conn, p *packet.DataPacket) error {
@@ -72,7 +71,30 @@ func (s *Server) Run(ctx context.Context) error {
 					cancel(fmt.Errorf("entry %w", err))
 					return
 				}
-				newConn(conn, s).start()
+				c := newConn(conn, s)
+				c.serve()
+			}
+		}
+	}()
+	go func() {
+		listener, err := net.Listen("tcp", ":4567")
+		if err != nil {
+			cancel(fmt.Errorf("entry %w", err))
+			return
+		}
+		for {
+			select {
+			case <-ctx.Done():
+				fmt.Println("entry server stoped1")
+				return
+			default:
+				conn, err := listener.Accept()
+				if err != nil {
+					cancel(fmt.Errorf("entry %w", err))
+					return
+				}
+				c := newPeer(conn, s)
+				c.serve()
 			}
 		}
 	}()
@@ -104,55 +126,44 @@ func (s *Server) HandleData(handler DataHandler) {
 }
 func (s *Server) Shutdown(ctx context.Context) {
 }
-func (s *Server) SendPacket(ctx context.Context, uid string, packet packet.Packet) {
-
+func (s *Server) SendData(p *packet.DataPacket, to string) error {
+	if conn, ok := s.conns.Get(to); ok {
+		return conn.SendPacket(p)
+	}
+	return fmt.Errorf("conn not found")
+}
+func (s *Server) handlePeerData(ctx context.Context, p *packet.DataPacket) {
+	if conns, ok := s.subs.Get(""); ok {
+		for _, conn := range conns {
+			conn.SendPacket(p)
+		}
+	}
 }
 func (s *Server) register(conn *Conn) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	user := conn.User()
-	if user == nil {
+	clientId, ok := conn.ClientID()
+	if !ok {
 		return
 	}
-	if mp, ok := s.conns[user.UserID]; ok {
-		if old, ok := mp[user.Platform]; ok {
+	s.conns.Write(func(m map[string]*Conn) {
+		if old, ok := m[clientId]; ok {
 			old.Close(packet.CloseDuplicateLogin)
 		}
-		mp[user.Platform] = conn
-	} else {
-		s.conns[user.UserID] = ConnMap{user.Platform: conn}
+		m[clientId] = conn
+	})
+}
+func (s *Server) addPeer(peer *peer) {
+	clientId, ok := peer.ClientID()
+	if !ok {
+		return
 	}
+	s.peers.Set(clientId, peer)
 }
 
-func (s *Server) KickUser(userID string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if mp, ok := s.conns[userID]; ok {
-		for _, conn := range mp {
+func (s *Server) KickClient(clientID string) {
+	s.conns.Write(func(m map[string]*Conn) {
+		if conn, ok := m[clientID]; ok {
 			conn.Close(packet.CloseKickedOut)
+			delete(m, clientID)
 		}
-		delete(s.conns, userID)
-	}
-}
-func (s *Server) Kickout(clientOK bool, oldClients map[string]*Conn, newClient *Conn) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-}
-func (s *Server) GetConn(userID string, platform code.Platform) *Conn {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	if mp, ok := s.conns[userID]; ok {
-		if conn, ok := mp[platform]; ok {
-			return conn
-		}
-	}
-	return nil
-}
-func (s *Server) GetConns(userID string) ConnMap {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	if mp, ok := s.conns[userID]; ok {
-		return mp
-	}
-	return nil
+	})
 }

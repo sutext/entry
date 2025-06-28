@@ -8,20 +8,14 @@ import (
 	"sync"
 	"time"
 
-	"sutext.github.io/entry/code"
 	"sutext.github.io/entry/keepalive"
 	"sutext.github.io/entry/packet"
 )
 
-type ConnUser struct {
-	UserID      string
-	AccessToken string
-	Platform    code.Platform
-}
 type Conn struct {
 	mu         *sync.RWMutex
 	raw        net.Conn
-	user       *ConnUser
+	user       *packet.Identity
 	logger     *slog.Logger
 	server     *Server
 	loginOk    chan struct{}
@@ -45,12 +39,18 @@ func newConn(raw net.Conn, server *Server) *Conn {
 	})
 	return c
 }
-func (c *Conn) User() *ConnUser {
+func (c *Conn) ClientID() (string, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	return c.user
+	if c.user != nil {
+		return c.user.ClientID, true
+	}
+	return "", false
 }
+
 func (c *Conn) Close(code packet.CloseCode) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	if c.raw == nil {
 		return
 	}
@@ -69,7 +69,7 @@ func (c *Conn) Close(code packet.CloseCode) {
 func (c *Conn) isClosed() bool {
 	return c.raw == nil
 }
-func (c *Conn) start() {
+func (c *Conn) serve() {
 	go func() {
 		timer := time.NewTimer(time.Second * 10)
 		defer timer.Stop()
@@ -128,19 +128,15 @@ func (c *Conn) doLogin(ctx context.Context, p *packet.ConnectPacket) error {
 	if c.user != nil {
 		return fmt.Errorf("already login")
 	}
-	err := c.server.loginHandler(ctx, c, p)
+	err := c.server.loginHandler(ctx, c, p.Identity)
 	if err != nil {
 		return err
 	}
-	c.user = &ConnUser{
-		UserID:      p.UserID,
-		AccessToken: p.AccessToken,
-		Platform:    p.Platform,
-	}
+	c.user = p.Identity
 	c.loginOk <- struct{}{}
 	go c.server.register(c)
 	c.keepaplive.Start()
-	c.logger.Info("Login success", "user_id", p.UserID, "platform", p.Platform)
+	c.logger.Info("Login success", "user_id", c.user.UserID, "client_id", c.user.ClientID)
 	return nil
 }
 func (c *Conn) handlePacket(ctx context.Context, p packet.Packet) {

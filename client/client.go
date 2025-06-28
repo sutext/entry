@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"sutext.github.io/entry/backoff"
-	"sutext.github.io/entry/code"
 	"sutext.github.io/entry/keepalive"
 	"sutext.github.io/entry/logger"
 	"sutext.github.io/entry/packet"
@@ -18,20 +17,14 @@ import (
 
 var ErrNotConnected = errors.New("not connected")
 
-type Identity struct {
-	UserID      string
-	AccessToken string
-}
 type Client struct {
 	mu        *sync.RWMutex
 	conn      *conn
-	host      string
-	prot      string
+	config    *Config
 	status    Status
 	logger    *slog.Logger
 	retrier   *Retrier
-	identity  *Identity
-	platform  code.Platform
+	identity  *packet.Identity
 	retrying  bool
 	keepalive *keepalive.KeepAlive
 }
@@ -39,12 +32,10 @@ type Client struct {
 func New(config *Config) *Client {
 	c := &Client{
 		mu:        new(sync.RWMutex),
-		host:      config.Host,
-		prot:      config.Port,
+		config:    config,
 		status:    StatusUnknown,
 		logger:    logger.New(config.LoggerLevel, config.LoggerFormat),
 		retrier:   NewRetrier(100000, backoff.Constant(time.Second*2)),
-		platform:  config.Platform,
 		keepalive: keepalive.New(config.KeepAlive, config.PingTimeout),
 	}
 	c.keepalive.PingFunc(func() {
@@ -57,11 +48,8 @@ func New(config *Config) *Client {
 	return c
 }
 
-func (c *Client) Connect(userId string, accessToken string) {
-	c.identity = &Identity{
-		UserID:      userId,
-		AccessToken: accessToken,
-	}
+func (c *Client) Connect(identity *packet.Identity) {
+	c.identity = identity
 	switch c.Status() {
 	case StatusOpened, StatusOpening:
 		return
@@ -118,12 +106,12 @@ func (c *Client) reconnect() {
 	c.conn.onError(func(err error) {
 		c.tryClose(err)
 	})
-	err := c.conn.connect(net.JoinHostPort(c.host, c.prot))
+	err := c.conn.connect(net.JoinHostPort(c.config.Host, c.config.Port))
 	if err != nil {
 		c.tryClose(err)
 		return
 	}
-	c.SendPacket(packet.Connect(c.identity.UserID, c.platform, c.identity.AccessToken))
+	c.SendPacket(packet.Connect(c.identity))
 }
 
 func (c *Client) SendData(data []byte, packetId int64, dataType packet.DataType) error {

@@ -2,26 +2,31 @@ package packet
 
 import (
 	"fmt"
-
-	"sutext.github.io/entry/code"
 )
 
+const (
+	ConnectFlagIdentity uint8 = 0x01
+)
+
+type Identity struct {
+	Token    string
+	UserID   string
+	ClientID string
+}
 type ConnectPacket struct {
-	UserID      string
-	Platform    code.Platform
-	AccessToken string
+	Identity *Identity
+	flag     uint8
 }
 
-func Connect(userID string, platfrom code.Platform, accessToken string) *ConnectPacket {
-	return &ConnectPacket{
-		UserID:      userID,
-		Platform:    platfrom,
-		AccessToken: accessToken,
+func Connect(identity *Identity) *ConnectPacket {
+	var flag uint8 = 0
+	if identity != nil {
+		flag |= ConnectFlagIdentity
 	}
+	return &ConnectPacket{Identity: identity, flag: flag}
 }
-
 func (p *ConnectPacket) String() string {
-	return fmt.Sprintf("CONNECT(uid=%s,platform=%d, token=%s)", p.UserID, p.Platform, p.AccessToken)
+	return fmt.Sprintf("CONNECT(uid=%s, cid=%s, token=%s)", p.Identity.UserID, p.Identity.ClientID, p.Identity.Token)
 }
 func (p *ConnectPacket) Type() PacketType {
 	return CONNECT
@@ -34,32 +39,47 @@ func (p *ConnectPacket) Equal(other Packet) bool {
 		return false
 	}
 	otherP := other.(*ConnectPacket)
-	return p.Platform == otherP.Platform && p.UserID == otherP.UserID && p.AccessToken == otherP.AccessToken
+	return p.Identity.Token == otherP.Identity.Token &&
+		p.Identity.UserID == otherP.Identity.UserID &&
+		p.Identity.ClientID == otherP.Identity.ClientID &&
+		p.flag == otherP.flag
 }
 func (p *ConnectPacket) encode() []byte {
 	buffer := newBuffer([]byte{})
-	buffer.writeString(p.UserID)
-	buffer.writeUInt8(byte(p.Platform))
-	buffer.writeString(p.AccessToken)
+	buffer.writeUInt8(p.flag)
+	if p.flag&ConnectFlagIdentity != 0 {
+		buffer.writeString(p.Identity.Token)
+		buffer.writeString(p.Identity.UserID)
+		buffer.writeString(p.Identity.ClientID)
+	}
 	return buffer.bytes()
 }
 func (p *ConnectPacket) decode(data []byte) error {
 	buffer := newBuffer(data)
-	userID, err := buffer.readString()
+	flag, err := buffer.readUInt8()
 	if err != nil {
 		return err
 	}
-	platform, err := buffer.readUInt8()
-	if err != nil {
-		return err
+	p.flag = flag
+	if flag&ConnectFlagIdentity != 0 {
+		token, err := buffer.readString()
+		if err != nil {
+			return err
+		}
+		userID, err := buffer.readString()
+		if err != nil {
+			return err
+		}
+		clientID, err := buffer.readString()
+		if err != nil {
+			return err
+		}
+		p.Identity = &Identity{
+			Token:    token,
+			UserID:   userID,
+			ClientID: clientID,
+		}
 	}
-	accessToken, err := buffer.readString()
-	if err != nil {
-		return err
-	}
-	p.Platform = code.Platform(platform)
-	p.UserID = userID
-	p.AccessToken = accessToken
 	return nil
 }
 

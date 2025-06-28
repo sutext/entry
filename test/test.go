@@ -8,27 +8,28 @@ import (
 
 	"sutext.github.io/entry/backoff"
 	"sutext.github.io/entry/client"
+	"sutext.github.io/entry/packet"
 )
 
 type Client struct {
-	cli         *client.Client
-	userId      string
-	accessToken string
-	backoff     backoff.Backoff
-	count       int
+	cli     *client.Client
+	userId  string
+	token   string
+	backoff backoff.Backoff
+	count   int
 }
 
 func RandomClient() *Client {
 	return &Client{
-		cli:         client.New(client.NewConfig()),
-		userId:      fmt.Sprintf("user_%d", rand.Int()),
-		accessToken: fmt.Sprintf("access_token_%d", rand.Int()),
-		backoff:     backoff.Random(time.Second*5, time.Second*10),
-		count:       0,
+		cli:     client.New(client.NewConfig()),
+		userId:  fmt.Sprintf("user_%d", rand.Int()),
+		token:   fmt.Sprintf("access_token_%d", rand.Int()),
+		backoff: backoff.Random(time.Second*5, time.Second*10),
+		count:   0,
 	}
 }
 func (c *Client) Start() {
-	c.cli.Connect(c.userId, c.accessToken)
+	c.cli.Connect(&packet.Identity{Token: c.userId, UserID: c.userId, ClientID: c.token})
 	var pkgid int64 = 1
 	for {
 		pkgid++
