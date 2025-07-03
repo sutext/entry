@@ -1,6 +1,10 @@
 package packet
 
-import "fmt"
+import (
+	"fmt"
+
+	"sutext.github.io/entry/buffer"
+)
 
 type CloseCode uint16
 
@@ -79,15 +83,13 @@ func (p *ClosePacket) Equal(other Packet) bool {
 	otherClose := other.(*ClosePacket)
 	return p.Code == otherClose.Code
 }
-func (p *ClosePacket) encode() []byte {
-	buffer := newBuffer([]byte{})
-	buffer.writeUInt16(uint16(p.Code))
-	return buffer.bytes()
+func (p *ClosePacket) WriteTo(w *buffer.Buffer) error {
+	w.WriteUInt16(uint16(p.Code))
+	return nil
 }
 
-func (p *ClosePacket) decode(data []byte) error {
-	buffer := newBuffer(data)
-	code, err := buffer.readUInt16()
+func (p *ClosePacket) ReadFrom(buffer *buffer.Buffer) error {
+	code, err := buffer.ReadUInt16()
 	if err != nil {
 		return err
 	}

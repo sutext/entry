@@ -45,9 +45,10 @@ func (c *conn) close() error {
 	if c.raw == nil {
 		return nil
 	}
+	err := c.raw.Close()
 	c.pkgFunc = nil
 	c.errFunc = nil
-	return c.raw.Close()
+	return err
 }
 
 func (c *conn) sendPacket(p packet.Packet) error {

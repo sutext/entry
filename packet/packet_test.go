@@ -12,16 +12,15 @@ func TestPacket(t *testing.T) {
 	testp(t, Connack(0))
 	testp(t, SmallData())
 	testp(t, BigData())
-	testp(t, DataAck(1))
 	testp(t, Ping())
 	testp(t, Pong())
 	testp(t, Close(0))
 }
 func SmallData() Packet {
-	return Data0(DataTypeText, []byte("hello world"))
+	return Data(DataText, []byte("hello world"))
 }
 func BigData() Packet {
-	return Data(DataTypeText, 1123123, []byte("hellfasdfhellfasdfsafsadfasdfasdfasdfsdafasdfasdfsd;afjjjjdslfjasl;dkfjasdlfjasdl;kfjasl;dfjsadlk;fjasl;dkfjasldk;fjlskd;ajflasdkfjlaksdjfalsd;fjalsd;kfjsadl;kfjasl;dkfjasdl;kfjalsdkfjals;dkfjasld;kfjals;dkfjsal;dkfjalsd;kfjlas;dkfjalsdkfjsld;fjals;dfjals;fjaldsk;ohellfasdfsafsadfasdfasdfasdfsdafasdfasdfsd;afjjjjdslfjasl;dkfjasdlfjasdl;kfjasl;dfjsadlk;fjasl;dkfjasldk;fjlskd;ajflasdkfjlaksdjfalsd;fjalsd;kfjsadl;kfjasl;dkfjasdl;kfjalsdkfjals;dkfjasld;kfjals;dkfjsal;dkfjalsd;kfjlas;dkfjalsdkfjsld;fjals;dfjals;fjaldsk;ohellfasdfsafsadfasdfasdfasdfsdafasdfasdfsd;afjjjjdslfjasl;dkfjasdlfjasdl;kfjasl;dfjsadlk;fjasl;dkfjasldk;fjlskd;ajflasdkfjlaksdjfalsd;fjalsd;kfjsadl;kfjasl;dkfjasdl;kfjalsdkfjals;dkfjasld;kfjals;dkfjsal;dkfjalsd;kfjlas;dkfjalsdkfjsld;fjals;dfjals;fjaldsk;ohellfasdfsafsadfasdfasdfasdfsdafasdfasdfsd;afjjjjdslfjasl;dkfjasdlfjasdl;kfjasl;dfjsadlk;fjasl;dkfjasldk;fjlskd;ajflasdkfjlaksdjfalsd;fjalsd;kfjsadl;kfjasl;dkfjasdl;kfjalsdkfjals;dkfjasld;kfjals;dkfjsal;dkfjalsd;kfjlas;dkfjalsdkfjsld;fjals;dfjals;fjaldsk;ohellfasdfsafsadfasdfasdfasdfsdafasdfasdfsd;afjjjjdslfjasl;dkfjasdlfjasdl;kfjasl;dfjsadlk;fjasl;dkfjasldk;fjlskd;ajflasdkfjlaksdjfalsd;fjalsd;kfjsadl;kfjasl;dkfjasdl;kfjalsdkfjals;dkfjasld;kfjals;dkfjsal;dkfjalsd;kfjlas;dkfjalsdkfjsld;fjals;dfjals;fjaldsk;ohellfasdfsafsadfasdfasdfasdfsdafasdfasdfsd;afjjjjdslfjasl;dkfjasdlfjasdl;kfjasl;dfjsadlk;fjasl;dkfjasldk;fjlskd;ajflasdkfjlaksdjfalsd;fjalsd;kfjsadl;kfjasl;dkfjasdl;kfjalsdkfjals;dkfjasld;kfjals;dkfjsal;dkfjalsd;kfjlas;dkfjalsdkfjsld;fjals;dfjals;fjaldsk;ohellfasdfsafsadfasdfasdfasdfsdafasdfasdfsd;afjjjjdslfjasl;dkfjasdlfjasdl;kfjasl;dfjsadlk;fjasl;dkfjasldk;fjlskd;ajflasdkfjlaksdjfalsd;fjalsd;kfjsadl;kfjasl;dkfjasdl;kfjalsdkfjals;dkfjasld;kfjals;dkfjsal;dkfjalsd;kfjlas;dkfjalsdkfjsld;fjals;dfjals;fjaldsk;ohellfasdfsafsadfasdfasdfasdfsdafasdfasdfsd;afjjjjdslfjasl;dkfjasdlfjasdl;kfjasl;dfjsadlk;fjasl;dkfjasldk;fjlskd;ajflasdkfjlaksdjfalsd;fjalsd;kfjsadl;kfjasl;dkfjasdl;kfjalsdkfjals;dkfjasld;kfjals;dkfjsal;dkfjalsd;kfjlas;dkfjalsdkfjsld;fjals;dfjals;fjaldsk;osafsadfasdfasdfasdfsdafasdfasdfsd;afjjjjdslfjasl;dkfjasdlfjasdl;kfjasl;dfjsadlk;fjasl;dkfjasldk;fjlskd;ajflasdkfjlaksdjfalsd;fjalsd;kfjsadl;kfjasl;dkfjasdl;kfjalsdkfjals;dkfjasld;kfjals;dkfjsal;dkfjalsd;kfjlas;dkfjalsdkfjsld;fjals;dfjals;fjaldsk;o"))
+	return Data(DataText, []byte("hellfasdfhellfasdfsafsadfasdfasdfasdfsdafasdfasdfsd;afjjjjdslfjasl;dkfjasdlfjasdl;kfjasl;dfjsadlk;fjasl;dkfjasldk;fjlskd;ajflasdkfjlaksdjfalsd;fjalsd;kfjsadl;kfjasl;dkfjasdl;kfjalsdkfjals;dkfjasld;kfjals;dkfjsal;dkfjalsd;kfjlas;dkfjalsdkfjsld;fjals;dfjals;fjaldsk;ohellfasdfsafsadfasdfasdfasdfsdafasdfasdfsd;afjjjjdslfjasl;dkfjasdlfjasdl;kfjasl;dfjsadlk;fjasl;dkfjasldk;fjlskd;ajflasdkfjlaksdjfalsd;fjalsd;kfjsadl;kfjasl;dkfjasdl;kfjalsdkfjals;dkfjasld;kfjals;dkfjsal;dkfjalsd;kfjlas;dkfjalsdkfjsld;fjals;dfjals;fjaldsk;ohellfasdfsafsadfasdfasdfasdfsdafasdfasdfsd;afjjjjdslfjasl;dkfjasdlfjasdl;kfjasl;dfjsadlk;fjasl;dkfjasldk;fjlskd;ajflasdkfjlaksdjfalsd;fjalsd;kfjsadl;kfjasl;dkfjasdl;kfjalsdkfjals;dkfjasld;kfjals;dkfjsal;dkfjalsd;kfjlas;dkfjalsdkfjsld;fjals;dfjals;fjaldsk;ohellfasdfsafsadfasdfasdfasdfsdafasdfasdfsd;afjjjjdslfjasl;dkfjasdlfjasdl;kfjasl;dfjsadlk;fjasl;dkfjasldk;fjlskd;ajflasdkfjlaksdjfalsd;fjalsd;kfjsadl;kfjasl;dkfjasdl;kfjalsdkfjals;dkfjasld;kfjals;dkfjsal;dkfjalsd;kfjlas;dkfjalsdkfjsld;fjals;dfjals;fjaldsk;ohellfasdfsafsadfasdfasdfasdfsdafasdfasdfsd;afjjjjdslfjasl;dkfjasdlfjasdl;kfjasl;dfjsadlk;fjasl;dkfjasldk;fjlskd;ajflasdkfjlaksdjfalsd;fjalsd;kfjsadl;kfjasl;dkfjasdl;kfjalsdkfjals;dkfjasld;kfjals;dkfjsal;dkfjalsd;kfjlas;dkfjalsdkfjsld;fjals;dfjals;fjaldsk;ohellfasdfsafsadfasdfasdfasdfsdafasdfasdfsd;afjjjjdslfjasl;dkfjasdlfjasdl;kfjasl;dfjsadlk;fjasl;dkfjasldk;fjlskd;ajflasdkfjlaksdjfalsd;fjalsd;kfjsadl;kfjasl;dkfjasdl;kfjalsdkfjals;dkfjasld;kfjals;dkfjsal;dkfjalsd;kfjlas;dkfjalsdkfjsld;fjals;dfjals;fjaldsk;ohellfasdfsafsadfasdfasdfasdfsdafasdfasdfsd;afjjjjdslfjasl;dkfjasdlfjasdl;kfjasl;dfjsadlk;fjasl;dkfjasldk;fjlskd;ajflasdkfjlaksdjfalsd;fjalsd;kfjsadl;kfjasl;dkfjasdl;kfjalsdkfjals;dkfjasld;kfjals;dkfjsal;dkfjalsd;kfjlas;dkfjalsdkfjsld;fjals;dfjals;fjaldsk;ohellfasdfsafsadfasdfasdfasdfsdafasdfasdfsd;afjjjjdslfjasl;dkfjasdlfjasdl;kfjasl;dfjsadlk;fjasl;dkfjasldk;fjlskd;ajflasdkfjlaksdjfalsd;fjalsd;kfjsadl;kfjasl;dkfjasdl;kfjalsdkfjals;dkfjasld;kfjals;dkfjsal;dkfjalsd;kfjlas;dkfjalsdkfjsld;fjals;dfjals;fjaldsk;osafsadfasdfasdfasdfsdafasdfasdfsd;afjjjjdslfjasl;dkfjasdlfjasdl;kfjasl;dfjsadlk;fjasl;dkfjasldk;fjlskd;ajflasdkfjlaksdjfalsd;fjalsd;kfjsadl;kfjasl;dkfjasdl;kfjalsdkfjals;dkfjasld;kfjals;dkfjsal;dkfjalsd;kfjlas;dkfjalsdkfjsld;fjals;dfjals;fjaldsk;o"))
 }
 func testp(t *testing.T, p Packet) {
 	rw := &ReadWriter{}
@@ -39,8 +38,6 @@ func testp(t *testing.T, p Packet) {
 		t.Error("data packet not equal")
 	}
 }
-
-// Below is the code of /Users/supertext/limtp/packet/readwriter.go
 
 type ReadWriter struct {
 	data []byte

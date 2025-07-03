@@ -27,15 +27,14 @@ func (k *KeepAlive) Start() {
 	k.stop = make(chan struct{})
 	k.mu.Unlock()
 	go func() {
-		timer := time.NewTimer(k.interval * time.Second)
+		ticker := time.NewTicker(k.interval * time.Second)
 		for {
 			select {
 			case <-k.stop:
-				timer.Stop()
+				ticker.Stop()
 				return
-			case <-timer.C:
+			case <-ticker.C:
 				go k.sendPing()
-				timer.Reset(k.interval * time.Second)
 			}
 		}
 	}()

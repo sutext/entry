@@ -1,7 +1,6 @@
 package client
 
 import (
-	"context"
 	"encoding/json"
 	"errors"
 	"log/slog"
@@ -17,16 +16,18 @@ import (
 
 var ErrNotConnected = errors.New("not connected")
 
+type DataHandler func(p *packet.DataPacket) error
 type Client struct {
-	mu        *sync.RWMutex
-	conn      *conn
-	config    *Config
-	status    Status
-	logger    *slog.Logger
-	retrier   *Retrier
-	identity  *packet.Identity
-	retrying  bool
-	keepalive *keepalive.KeepAlive
+	mu          *sync.RWMutex
+	conn        *conn
+	config      *Config
+	status      Status
+	logger      *slog.Logger
+	retrier     *Retrier
+	identity    *packet.Identity
+	retrying    bool
+	keepalive   *keepalive.KeepAlive
+	dataHandler DataHandler
 }
 
 func New(config *Config) *Client {
@@ -47,7 +48,9 @@ func New(config *Config) *Client {
 	})
 	return c
 }
-
+func (c *Client) HandleData(handler DataHandler) {
+	c.dataHandler = handler
+}
 func (c *Client) Connect(identity *packet.Identity) {
 	c.identity = identity
 	switch c.Status() {
@@ -100,12 +103,8 @@ func (c *Client) reconnect() {
 		c.conn = nil
 	}
 	c.conn = &conn{}
-	c.conn.onPacket(func(p packet.Packet) {
-		c.handlePacket(context.Background(), p)
-	})
-	c.conn.onError(func(err error) {
-		c.tryClose(err)
-	})
+	c.conn.onPacket(c.handlePacket)
+	c.conn.onError(c.tryClose)
 	err := c.conn.connect(net.JoinHostPort(c.config.Host, c.config.Port))
 	if err != nil {
 		c.tryClose(err)
@@ -114,28 +113,22 @@ func (c *Client) reconnect() {
 	c.SendPacket(packet.Connect(c.identity))
 }
 
-func (c *Client) SendData(data []byte, packetId int64, dataType packet.DataType) error {
-	dataPacket := packet.Data(dataType, packetId, data)
+func (c *Client) SendData(data []byte) error {
+	dataPacket := packet.Data(packet.DataBinary, data)
 	return c.SendPacket(dataPacket)
 }
-func (c *Client) SendData0(data []byte, dataType packet.DataType) error {
-	dataPacket := packet.Data0(dataType, data)
+
+func (c *Client) SendText(text string) error {
+	dataPacket := packet.Data(packet.DataText, []byte(text))
 	return c.SendPacket(dataPacket)
 }
-func (c *Client) SendText(text string, packetId int64) error {
-	dataPacket := packet.Data(packet.DataTypeText, packetId, []byte(text))
-	return c.SendPacket(dataPacket)
-}
-func (c *Client) SendText0(text string) error {
-	dataPacket := packet.Data0(packet.DataTypeText, []byte(text))
-	return c.SendPacket(dataPacket)
-}
-func (c *Client) SendJSON(j any, packetId int64) error {
+
+func (c *Client) SendJSON(j any) error {
 	jsonData, err := json.Marshal(j)
 	if err != nil {
 		return err
 	}
-	dataPacket := packet.Data(packet.DataTypeText, packetId, jsonData)
+	dataPacket := packet.Data(packet.DataJSON, jsonData)
 	return c.SendPacket(dataPacket)
 }
 func (c *Client) SendPing() error {
@@ -143,14 +136,6 @@ func (c *Client) SendPing() error {
 }
 func (c *Client) SendPong() error {
 	return c.SendPacket(packet.Pong())
-}
-func (c *Client) SendJSON0(j any) error {
-	jsonData, err := json.Marshal(j)
-	if err != nil {
-		return err
-	}
-	dataPacket := packet.Data0(packet.DataTypeText, jsonData)
-	return c.SendPacket(dataPacket)
 }
 func (c *Client) SendPacket(p packet.Packet) error {
 	if c.conn == nil {
@@ -188,7 +173,7 @@ func (c *Client) setStatus(status Status) {
 		c.keepalive.Start()
 	}
 }
-func (c *Client) handlePacket(ctx context.Context, p packet.Packet) {
+func (c *Client) handlePacket(p packet.Packet) {
 	c.logger.Info("receive packet", "packet", p.String())
 	switch p := p.(type) {
 	case *packet.ConnackPacket:
@@ -197,7 +182,12 @@ func (c *Client) handlePacket(ctx context.Context, p packet.Packet) {
 		}
 		c.safeSetStatus(StatusOpened)
 	case *packet.DataPacket:
-
+		if c.dataHandler != nil {
+			err := c.dataHandler(p)
+			if err != nil {
+				c.logger.Error("data handler error", "error", err)
+			}
+		}
 	case *packet.PingPacket:
 		c.SendPong()
 	case *packet.PongPacket:

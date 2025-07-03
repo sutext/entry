@@ -1,94 +1,55 @@
 package packet
 
 import (
-	"encoding/json"
 	"fmt"
 	"reflect"
+
+	"sutext.github.io/entry/buffer"
 )
 
-type DataQos uint8
+type DataEncoding byte
 
 const (
-	DataQosZero DataQos = 0
-	DataQosOne  DataQos = 1
+	DataText   DataEncoding = 0
+	DataJSON   DataEncoding = 1
+	DataBinary DataEncoding = 2
 )
 
-func (t DataQos) String() string {
+func (t DataEncoding) String() string {
 	switch t {
-	case DataQosZero:
-		return "qos0"
-	case DataQosOne:
-		return "qos1"
+	case DataText:
+		return "Text"
+	case DataJSON:
+		return "JSON"
+	case DataBinary:
+		return "Binary"
 	default:
-		return "unknown"
-	}
-}
-
-type DataType byte
-
-const (
-	DataTypeText     DataType = 0
-	DataTypeJSON     DataType = 1
-	DataTypeMsgPack  DataType = 2
-	DataTypeProtoBuf DataType = 3
-)
-
-func (t DataType) String() string {
-	switch t {
-	case DataTypeText:
-		return "text"
-	case DataTypeJSON:
-		return "json"
-	case DataTypeMsgPack:
-		return "msgpack"
-	case DataTypeProtoBuf:
-		return "protobuf"
-	default:
-		return "unknown"
+		return "Custom"
 	}
 }
 
 type DataPacket struct {
-	Qos      DataQos
-	DataType DataType
-	PacketId int64
+	Encoding DataEncoding
 	Payload  []byte
 }
 
-func Data(dataType DataType, packetId int64, payload []byte) *DataPacket {
+func Data(dataType DataEncoding, payload []byte) *DataPacket {
 	return &DataPacket{
-		Qos:      DataQosOne,
-		DataType: dataType,
-		PacketId: packetId,
-		Payload:  payload,
-	}
-}
-func Data0(dataType DataType, payload []byte) *DataPacket {
-	return &DataPacket{
-		Qos:      DataQosZero,
-		DataType: dataType,
-		PacketId: 0,
+		Encoding: dataType,
 		Payload:  payload,
 	}
 }
 
 func (p *DataPacket) String() string {
-	switch p.DataType {
-	case DataTypeText:
-		return fmt.Sprintf("Text(%s,packetId=%d)", string(p.Payload), p.PacketId)
-	case DataTypeJSON:
-		var j any
-		err := json.Unmarshal(p.Payload, &j)
-		if err != nil {
-			return fmt.Sprintf("JSONError(%s)", err.Error())
-		}
-		return fmt.Sprintf("JSON(%s,packetId=%d)", j, p.PacketId)
-	case DataTypeMsgPack:
-		return fmt.Sprintf("MsgPack(%d bytes,packetId=%d)", len(p.Payload), p.PacketId)
-	case DataTypeProtoBuf:
-		return fmt.Sprintf("ProtoBuf(%d bytes,packetId=%d)", len(p.Payload), p.PacketId)
+	switch p.Encoding {
+	case DataText:
+		return fmt.Sprintf("DATA{%s, Payload: %s}", p.Encoding, string(p.Payload))
+	case DataJSON:
+		return fmt.Sprintf("DATA{%s, Payload: %s}", p.Encoding, string(p.Payload))
+	case DataBinary:
+		return fmt.Sprintf("DATA{%s, Payload: %d bytes}", p.Encoding, len(p.Payload))
 	default:
-		return fmt.Sprintf("DATA(qos=%s,dataType=%s,packetId=%d, payload=%s)", p.Qos, p.DataType, p.PacketId, string(p.Payload))
+		return fmt.Sprintf("DATA{%s, Payload: %d bytes}", p.Encoding, len(p.Payload))
 	}
 }
 func (p *DataPacket) Type() PacketType {
@@ -102,81 +63,21 @@ func (p *DataPacket) Equal(other Packet) bool {
 		return false
 	}
 	otherData := other.(*DataPacket)
-	return p.PacketId == otherData.PacketId && reflect.DeepEqual(p.Payload, otherData.Payload)
-}
-func (p *DataPacket) encode() []byte {
-	buffer := newBuffer([]byte{})
-	buffer.writeUInt8(uint8(p.Qos))
-	buffer.writeUInt8(uint8(p.DataType))
-	if p.Qos > 0 {
-		buffer.writeInt64(p.PacketId)
-	}
-	buffer.writeBytes(p.Payload)
-	return buffer.bytes()
+	return p.Encoding == otherData.Encoding && reflect.DeepEqual(p.Payload, otherData.Payload)
 }
 
-func (p *DataPacket) decode(data []byte) error {
-	buffer := newBuffer(data)
-	qos, err := buffer.readUInt8()
-	if err != nil {
-		return err
-	}
-	dataType, err := buffer.readUInt8()
-	if err != nil {
-		return err
-	}
-	p.Qos = DataQos(qos)
-	p.DataType = DataType(dataType)
-	if qos > 0 {
-		packetId, err := buffer.readInt64()
-		if err != nil {
-			return err
-		}
-		p.PacketId = packetId
-	}
-	payload, err := buffer.readAll()
-	if err != nil {
-		return err
-	}
-	p.Payload = payload
+func (p *DataPacket) WriteTo(buf *buffer.Buffer) error {
+	buf.WriteUInt8(uint8(p.Encoding))
+	buf.WriteBytes(p.Payload)
 	return nil
 }
 
-type DataAckPacket struct {
-	PacketId int64
-}
-
-func DataAck(packetId int64) Packet {
-	return &DataAckPacket{PacketId: packetId}
-}
-func (p *DataAckPacket) String() string {
-	return fmt.Sprintf("DATAACK(packetId=%d)", p.PacketId)
-}
-func (p *DataAckPacket) Type() PacketType {
-	return DATAACK
-}
-func (p *DataAckPacket) Equal(other Packet) bool {
-	if other == nil {
-		return false
-	}
-	if p.Type() != other.Type() {
-		return false
-	}
-	otherAck := other.(*DataAckPacket)
-	return p.PacketId == otherAck.PacketId
-}
-func (p *DataAckPacket) encode() []byte {
-	buffer := newBuffer([]byte{})
-	buffer.writeInt64(p.PacketId)
-	return buffer.bytes()
-}
-
-func (p *DataAckPacket) decode(data []byte) error {
-	buffer := newBuffer(data)
-	packetId, err := buffer.readInt64()
+func (p *DataPacket) ReadFrom(buf *buffer.Buffer) error {
+	dataType, err := buf.ReadUInt8()
 	if err != nil {
 		return err
 	}
-	p.PacketId = packetId
-	return nil
+	p.Encoding = DataEncoding(dataType)
+	p.Payload, err = buf.ReadAll()
+	return err
 }

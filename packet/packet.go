@@ -4,6 +4,8 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+
+	"sutext.github.io/entry/buffer"
 )
 
 const (
@@ -17,11 +19,10 @@ type PacketType uint8
 const (
 	CONNECT PacketType = 1 // CONNECT packet
 	CONNACK PacketType = 2 // CONNACK packet
-	DATA    PacketType = 3 // DATA packet
-	DATAACK PacketType = 4 // DATAACK packet
-	PING    PacketType = 5 // PING packet
-	PONG    PacketType = 6 // PONG packet
-	CLOSE   PacketType = 7 // CLOSE packet
+	PING    PacketType = 3 // PING packet
+	PONG    PacketType = 4 // PONG packet
+	DATA    PacketType = 5 // DATA packet
+	CLOSE   PacketType = 6 // CLOSE packet
 )
 
 func (t PacketType) String() string {
@@ -30,14 +31,12 @@ func (t PacketType) String() string {
 		return "CONNECT"
 	case CONNACK:
 		return "CONNACK"
-	case DATA:
-		return "DATA"
-	case DATAACK:
-		return "DATAACK"
 	case PING:
 		return "PING"
 	case PONG:
 		return "PONG"
+	case DATA:
+		return "DATA"
 	case CLOSE:
 		return "CLOSE"
 	default:
@@ -47,10 +46,10 @@ func (t PacketType) String() string {
 
 type Packet interface {
 	fmt.Stringer
+	buffer.WriteTo
+	buffer.ReadFrom
 	Type() PacketType
 	Equal(Packet) bool
-	encode() []byte
-	decode(data []byte) error
 }
 
 type incomming struct {
@@ -59,42 +58,36 @@ type incomming struct {
 }
 
 func (i incomming) decode() (Packet, error) {
+	buf := buffer.New(i.data)
 	switch i.packetType {
 	case CONNECT:
 		conn := &ConnectPacket{}
-		err := conn.decode(i.data)
+		err := conn.ReadFrom(buf)
 		if err != nil {
 			return nil, err
 		}
 		return conn, nil
 	case CONNACK:
 		connack := &ConnackPacket{}
-		err := connack.decode(i.data)
+		err := connack.ReadFrom(buf)
 		if err != nil {
 			return nil, err
 		}
 		return connack, nil
 	case DATA:
 		data := &DataPacket{}
-		err := data.decode(i.data)
+		err := data.ReadFrom(buf)
 		if err != nil {
 			return nil, err
 		}
 		return data, nil
-	case DATAACK:
-		dataack := &DataAckPacket{}
-		err := dataack.decode(i.data)
-		if err != nil {
-			return nil, err
-		}
-		return dataack, nil
 	case PING:
 		return Ping(), nil
 	case PONG:
 		return Pong(), nil
 	case CLOSE:
 		close := &ClosePacket{}
-		err := close.decode(i.data)
+		err := close.ReadFrom(buf)
 		if err != nil {
 			return nil, err
 		}
@@ -132,9 +125,13 @@ func ReadPacket(r io.Reader) (Packet, error) {
 	return imcoming.decode()
 }
 func WritePacket(w io.Writer, p Packet) error {
-	data := p.encode()
+	buf := buffer.New()
+	err := p.WriteTo(buf)
+	if err != nil {
+		return err
+	}
 	// write header
-	length := uint32(len(data))
+	length := uint32(buf.Len())
 	if length > MAX_LEN {
 		return ErrPacketSizeTooLarge
 	}
@@ -149,11 +146,11 @@ func WritePacket(w io.Writer, p Packet) error {
 		header[0] = byte(p.Type()<<5) | header[0]
 	}
 	// write data
-	_, err := w.Write(header)
+	_, err = w.Write(header)
 	if err != nil {
 		return err
 	}
-	_, err = w.Write(data)
+	_, err = w.Write(buf.Bytes())
 	if err != nil {
 		return err
 	}

@@ -2,6 +2,8 @@ package packet
 
 import (
 	"fmt"
+
+	"sutext.github.io/entry/buffer"
 )
 
 const (
@@ -44,33 +46,31 @@ func (p *ConnectPacket) Equal(other Packet) bool {
 		p.Identity.ClientID == otherP.Identity.ClientID &&
 		p.flag == otherP.flag
 }
-func (p *ConnectPacket) encode() []byte {
-	buffer := newBuffer([]byte{})
-	buffer.writeUInt8(p.flag)
+func (p *ConnectPacket) WriteTo(buffer *buffer.Buffer) error {
+	buffer.WriteUInt8(p.flag)
 	if p.flag&ConnectFlagIdentity != 0 {
-		buffer.writeString(p.Identity.Token)
-		buffer.writeString(p.Identity.UserID)
-		buffer.writeString(p.Identity.ClientID)
+		buffer.WriteString(p.Identity.Token)
+		buffer.WriteString(p.Identity.UserID)
+		buffer.WriteString(p.Identity.ClientID)
 	}
-	return buffer.bytes()
+	return nil
 }
-func (p *ConnectPacket) decode(data []byte) error {
-	buffer := newBuffer(data)
-	flag, err := buffer.readUInt8()
+func (p *ConnectPacket) ReadFrom(buffer *buffer.Buffer) error {
+	flag, err := buffer.ReadUInt8()
 	if err != nil {
 		return err
 	}
 	p.flag = flag
 	if flag&ConnectFlagIdentity != 0 {
-		token, err := buffer.readString()
+		token, err := buffer.ReadString()
 		if err != nil {
 			return err
 		}
-		userID, err := buffer.readString()
+		userID, err := buffer.ReadString()
 		if err != nil {
 			return err
 		}
-		clientID, err := buffer.readString()
+		clientID, err := buffer.ReadString()
 		if err != nil {
 			return err
 		}
@@ -115,10 +115,9 @@ func (p *ConnackPacket) String() string {
 func (P *ConnackPacket) Type() PacketType {
 	return CONNACK
 }
-func (p *ConnackPacket) encode() []byte {
-	buffer := newBuffer([]byte{})
-	buffer.writeUInt16(uint16(p.Code))
-	return buffer.bytes()
+func (p *ConnackPacket) WriteTo(buffer *buffer.Buffer) error {
+	buffer.WriteUInt16(uint16(p.Code))
+	return nil
 }
 func (p *ConnackPacket) Equal(other Packet) bool {
 	if other == nil {
@@ -130,9 +129,8 @@ func (p *ConnackPacket) Equal(other Packet) bool {
 	otherP := other.(*ConnackPacket)
 	return p.Code == otherP.Code
 }
-func (p *ConnackPacket) decode(data []byte) error {
-	buffer := newBuffer(data)
-	code, err := buffer.readUInt16()
+func (p *ConnackPacket) ReadFrom(buffer *buffer.Buffer) error {
+	code, err := buffer.ReadUInt16()
 	if err != nil {
 		return err
 	}

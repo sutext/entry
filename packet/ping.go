@@ -1,5 +1,7 @@
 package packet
 
+import "sutext.github.io/entry/buffer"
+
 type PingPacket struct{}
 
 func Ping() *PingPacket {
@@ -17,10 +19,10 @@ func (p *PingPacket) Equal(other Packet) bool {
 	}
 	return PING == other.Type()
 }
-func (p *PingPacket) encode() []byte {
+func (p *PingPacket) WriteTo(w *buffer.Buffer) error {
 	return nil
 }
-func (p *PingPacket) decode(data []byte) error {
+func (p *PingPacket) ReadFrom(r *buffer.Buffer) error {
 	return nil
 }
 
@@ -41,9 +43,9 @@ func (p *PongPacket) Equal(other Packet) bool {
 	}
 	return PONG == other.Type()
 }
-func (p *PongPacket) encode() []byte {
+func (p *PongPacket) WriteTo(w *buffer.Buffer) error {
 	return nil
 }
-func (p *PongPacket) decode(data []byte) error {
+func (p *PongPacket) ReadFrom(r *buffer.Buffer) error {
 	return nil
 }

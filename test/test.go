@@ -30,10 +30,8 @@ func RandomClient() *Client {
 }
 func (c *Client) Start() {
 	c.cli.Connect(&packet.Identity{Token: c.userId, UserID: c.userId, ClientID: c.token})
-	var pkgid int64 = 1
 	for {
-		pkgid++
-		c.cli.SendText("hello world", pkgid)
+		c.cli.SendText("hello world")
 		time.Sleep(c.backoff.Next(c.count))
 		c.count++
 	}
