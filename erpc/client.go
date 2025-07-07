@@ -20,10 +20,7 @@ type Client struct {
 }
 
 func Dail(host, prot string) (*Client, error) {
-	cfg := client.NewConfig()
-	cfg.Host = host
-	cfg.Port = prot
-	cli := client.New(cfg)
+	cli := client.New(host, prot)
 	cli.Connect(nil)
 	c := &Client{
 		cli:  cli,

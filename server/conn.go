@@ -12,37 +12,39 @@ import (
 )
 
 type conn struct {
-	mu         *sync.RWMutex
-	raw        net.Conn
-	user       *packet.Identity
-	logger     *slog.Logger
-	server     *Server
-	loginOk    chan struct{}
-	keepaplive *keepalive.KeepAlive
+	mu        *sync.RWMutex
+	raw       net.Conn
+	auth      *packet.Identity
+	logger    *slog.Logger
+	server    *Server
+	authed    chan struct{}
+	keepAlive *keepalive.KeepAlive
 }
 
 func newConn(raw net.Conn, server *Server) *conn {
 	c := &conn{
-		mu:         new(sync.RWMutex),
-		raw:        raw,
-		logger:     server.logger,
-		server:     server,
-		loginOk:    make(chan struct{}),
-		keepaplive: keepalive.New(server.config.KeepAlive, server.config.PingTimeout),
+		mu:     new(sync.RWMutex),
+		raw:    raw,
+		logger: server.logger,
+		server: server,
+		authed: make(chan struct{}),
 	}
-	c.keepaplive.PingFunc(func() {
-		c.sendPing()
-	})
-	c.keepaplive.TimeoutFunc(func() {
-		c.close(packet.CloseNormal)
-	})
+	if server.keepAlive != nil {
+		c.keepAlive = keepalive.New(server.keepAlive.interval, server.keepAlive.timeout)
+		c.keepAlive.PingFunc(func() {
+			c.sendPing()
+		})
+		c.keepAlive.TimeoutFunc(func() {
+			c.close(packet.CloseNormal)
+		})
+	}
 	return c
 }
 func (c *conn) clientId() (string, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	if c.user != nil {
-		return c.user.ClientID, true
+	if c.auth != nil {
+		return c.auth.ClientID, true
 	}
 	if c.raw != nil {
 		return c.raw.RemoteAddr().String(), true
@@ -59,15 +61,15 @@ func (c *conn) close(code packet.CloseCode) {
 	c.logger.Info("Close connection", "code", code)
 	c.sendPacket(packet.Close(code))
 	c.raw.Close()
-	c.keepaplive.Stop()
-	close(c.loginOk)
+	c.keepAlive.Stop()
+	close(c.authed)
 	c.mu = nil
 	c.raw = nil
-	c.keepaplive = nil
+	c.keepAlive = nil
 	c.server = nil
 	c.logger = nil
-	c.user = nil
-	c.loginOk = nil
+	c.auth = nil
+	c.authed = nil
 }
 func (c *conn) closed() bool {
 	return c.raw == nil
@@ -77,7 +79,7 @@ func (c *conn) serve() {
 		timer := time.NewTimer(time.Second * 10)
 		defer timer.Stop()
 		select {
-		case <-c.loginOk:
+		case <-c.authed:
 			return
 		case <-timer.C:
 			c.close(packet.CloseAuthenticationTimeout)
@@ -108,24 +110,24 @@ func (c *conn) sendPacket(p packet.Packet) error {
 	}
 	return packet.WritePacket(c.raw, p)
 }
-func (c *conn) doLogin(p *packet.ConnectPacket) error {
+func (c *conn) doAuth(id *packet.Identity) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.closed() {
 		return fmt.Errorf("connection already closed")
 	}
-	if c.user != nil {
+	if c.auth != nil {
 		return fmt.Errorf("already login")
 	}
-	err := c.server.loginHandler(p.Identity)
+	err := c.server.authHandler(id)
 	if err != nil {
 		return err
 	}
-	c.user = p.Identity
-	c.loginOk <- struct{}{}
+	c.auth = id
+	c.authed <- struct{}{}
 	go c.server.addConn(c)
-	c.keepaplive.Start()
-	c.logger.Info("Login success", "user_id", c.user.UserID, "client_id", c.user.ClientID)
+	c.keepAlive.Start()
+	c.logger.Info("Login success", "user_id", c.auth.UserID, "client_id", c.auth.ClientID)
 	return nil
 }
 func (c *conn) handlePacket(p packet.Packet) {
@@ -135,11 +137,13 @@ func (c *conn) handlePacket(p packet.Packet) {
 	c.logger.Debug("handle packet", "packet", p.String())
 	switch p := p.(type) {
 	case *packet.ConnectPacket:
-		err := c.doLogin(p)
-		if err != nil {
-			c.logger.Error("login failed", "error", err)
-			c.close(packet.CloseAuthenticationFailure)
-			return
+		if p.Identity != nil {
+			err := c.doAuth(p.Identity)
+			if err != nil {
+				c.logger.Error("login failed", "error", err)
+				c.close(packet.CloseAuthenticationFailure)
+				return
+			}
 		}
 		c.connack(packet.ConnectionAccepted)
 	case *packet.DataPacket:
@@ -154,7 +158,7 @@ func (c *conn) handlePacket(p packet.Packet) {
 	case *packet.PingPacket:
 		c.sendPong()
 	case *packet.PongPacket:
-		c.keepaplive.HandlePong()
+		c.keepAlive.HandlePong()
 	case *packet.ClosePacket:
 		c.close(p.Code)
 	default:

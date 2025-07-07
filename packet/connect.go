@@ -11,9 +11,9 @@ const (
 )
 
 type Identity struct {
-	Token    string
-	UserID   string
-	ClientID string
+	UserID    string
+	ClientID  string
+	AuthToken string
 }
 type ConnectPacket struct {
 	Identity *Identity
@@ -28,7 +28,7 @@ func Connect(identity *Identity) *ConnectPacket {
 	return &ConnectPacket{Identity: identity, flag: flag}
 }
 func (p *ConnectPacket) String() string {
-	return fmt.Sprintf("CONNECT(uid=%s, cid=%s, token=%s)", p.Identity.UserID, p.Identity.ClientID, p.Identity.Token)
+	return fmt.Sprintf("CONNECT(uid=%s, cid=%s, token=%s)", p.Identity.UserID, p.Identity.ClientID, p.Identity.AuthToken)
 }
 func (p *ConnectPacket) Type() PacketType {
 	return CONNECT
@@ -41,7 +41,7 @@ func (p *ConnectPacket) Equal(other Packet) bool {
 		return false
 	}
 	otherP := other.(*ConnectPacket)
-	return p.Identity.Token == otherP.Identity.Token &&
+	return p.Identity.AuthToken == otherP.Identity.AuthToken &&
 		p.Identity.UserID == otherP.Identity.UserID &&
 		p.Identity.ClientID == otherP.Identity.ClientID &&
 		p.flag == otherP.flag
@@ -49,7 +49,7 @@ func (p *ConnectPacket) Equal(other Packet) bool {
 func (p *ConnectPacket) WriteTo(buffer *buffer.Buffer) error {
 	buffer.WriteUInt8(p.flag)
 	if p.flag&ConnectFlagIdentity != 0 {
-		buffer.WriteString(p.Identity.Token)
+		buffer.WriteString(p.Identity.AuthToken)
 		buffer.WriteString(p.Identity.UserID)
 		buffer.WriteString(p.Identity.ClientID)
 	}
@@ -75,9 +75,9 @@ func (p *ConnectPacket) ReadFrom(buffer *buffer.Buffer) error {
 			return err
 		}
 		p.Identity = &Identity{
-			Token:    token,
-			UserID:   userID,
-			ClientID: clientID,
+			AuthToken: token,
+			UserID:    userID,
+			ClientID:  clientID,
 		}
 	}
 	return nil

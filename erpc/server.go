@@ -20,8 +20,7 @@ type Server struct {
 }
 
 func NewServer() *Server {
-	conf := server.NewConfig()
-	impl := server.New(conf)
+	impl := server.New()
 	s := &Server{
 		impl:     impl,
 		services: safe.NewMap(map[string]Service{}),
@@ -58,7 +57,7 @@ func (c *Server) handleData(p *packet.DataPacket) (*packet.DataPacket, error) {
 		buf := buffer.New()
 		buf.WriteUInt8(1)
 		res.WriteTo(buf)
-		return packet.Data(packet.DataBinary, buf.Bytes()), nil
+		return packet.Data(buf.Bytes()), nil
 	}
 
 }

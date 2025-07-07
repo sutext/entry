@@ -21,7 +21,7 @@ type Client struct {
 
 func RandomClient() *Client {
 	return &Client{
-		cli:     client.New(client.NewConfig()),
+		cli:     client.New("localhost", "8080"),
 		userId:  fmt.Sprintf("user_%d", rand.Int()),
 		token:   fmt.Sprintf("access_token_%d", rand.Int()),
 		backoff: backoff.Random(time.Second*5, time.Second*10),
@@ -29,9 +29,9 @@ func RandomClient() *Client {
 	}
 }
 func (c *Client) Start() {
-	c.cli.Connect(&packet.Identity{Token: c.userId, UserID: c.userId, ClientID: c.token})
+	c.cli.Connect(&packet.Identity{AuthToken: c.userId, UserID: c.userId, ClientID: c.token})
 	for {
-		c.cli.SendText("hello world")
+		c.cli.SendData([]byte("hello world"))
 		time.Sleep(c.backoff.Next(c.count))
 		c.count++
 	}

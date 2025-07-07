@@ -1,7 +1,6 @@
 package client
 
 import (
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"net"
@@ -20,7 +19,8 @@ type DataHandler func(p *packet.DataPacket) error
 type Client struct {
 	mu          *sync.RWMutex
 	conn        *conn
-	config      *Config
+	host        string
+	port        string
 	status      Status
 	logger      *slog.Logger
 	retrier     *Retrier
@@ -30,14 +30,15 @@ type Client struct {
 	dataHandler DataHandler
 }
 
-func New(config *Config) *Client {
+func New(host, port string) *Client {
 	c := &Client{
 		mu:        new(sync.RWMutex),
-		config:    config,
+		host:      host,
+		port:      port,
 		status:    StatusUnknown,
-		logger:    logger.New(config.LoggerLevel, config.LoggerFormat),
+		logger:    logger.New(logger.LevelDebug, logger.FormatJSON),
 		retrier:   NewRetrier(100000, backoff.Constant(time.Second*2)),
-		keepalive: keepalive.New(config.KeepAlive, config.PingTimeout),
+		keepalive: keepalive.New(60, 5),
 	}
 	c.keepalive.PingFunc(func() {
 		c.SendPacket(packet.Ping())
@@ -47,6 +48,15 @@ func New(config *Config) *Client {
 		c.tryClose(CloseReasonPingTimeout)
 	})
 	return c
+}
+func (c *Client) SetLogger(level logger.Level, format logger.Format) {
+	c.logger = logger.New(level, format)
+}
+func (c *Client) SetRetrier(limit int, backoff backoff.Backoff) {
+	c.retrier = NewRetrier(limit, backoff)
+}
+func (c *Client) SetKeepAlive(interval time.Duration, timeout time.Duration) {
+	c.keepalive = keepalive.New(interval, timeout)
 }
 func (c *Client) HandleData(handler DataHandler) {
 	c.dataHandler = handler
@@ -105,7 +115,7 @@ func (c *Client) reconnect() {
 	c.conn = &conn{}
 	c.conn.onPacket(c.handlePacket)
 	c.conn.onError(c.tryClose)
-	err := c.conn.connect(net.JoinHostPort(c.config.Host, c.config.Port))
+	err := c.conn.connect(net.JoinHostPort(c.host, c.port))
 	if err != nil {
 		c.tryClose(err)
 		return
@@ -114,23 +124,10 @@ func (c *Client) reconnect() {
 }
 
 func (c *Client) SendData(data []byte) error {
-	dataPacket := packet.Data(packet.DataBinary, data)
+	dataPacket := packet.Data(data)
 	return c.SendPacket(dataPacket)
 }
 
-func (c *Client) SendText(text string) error {
-	dataPacket := packet.Data(packet.DataText, []byte(text))
-	return c.SendPacket(dataPacket)
-}
-
-func (c *Client) SendJSON(j any) error {
-	jsonData, err := json.Marshal(j)
-	if err != nil {
-		return err
-	}
-	dataPacket := packet.Data(packet.DataJSON, jsonData)
-	return c.SendPacket(dataPacket)
-}
 func (c *Client) SendPing() error {
 	return c.SendPacket(packet.Ping())
 }
