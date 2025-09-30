@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"reflect"
 
 	"sutext.github.io/entry/buffer"
 )
@@ -155,4 +156,23 @@ func WritePacket(w io.Writer, p Packet) error {
 		return err
 	}
 	return nil
+}
+
+type packet struct {
+	packetType PacketType
+	data       []byte
+}
+
+func (p packet) Type() PacketType {
+	return p.packetType
+}
+
+func (p packet) Equal(other packet) bool {
+	if p.packetType != other.Type() {
+		return false
+	}
+	return reflect.DeepEqual(p.data, other.data)
+}
+func (p packet) String() string {
+	return p.String()
 }

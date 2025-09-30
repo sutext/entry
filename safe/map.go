@@ -112,28 +112,6 @@ func (m *Map[Key, Value]) Merge(other *Map[Key, Value]) {
 	defer m.mu.Unlock()
 	maps.Copy(m.mp, other.mp)
 }
-func (m *Map[Key, Value]) Diff(other *Map[Key, Value]) *Map[Key, Value] {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	diffMap := NewMap[map[Key]Value]()
-	for key, value := range m.mp {
-		if _, ok := other.mp[key]; !ok {
-			diffMap.Set(key, value)
-		}
-	}
-	return diffMap
-}
-func (m *Map[Key, Value]) Intersect(other *Map[Key, Value]) *Map[Key, Value] {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
-	intersectMap := NewMap[map[Key]Value]()
-	for key, value := range m.mp {
-		if _, ok := other.mp[key]; ok {
-			intersectMap.Set(key, value)
-		}
-	}
-	return intersectMap
-}
 func (m *Map[Key, Value]) Union(other *Map[Key, Value]) *Map[Key, Value] {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
