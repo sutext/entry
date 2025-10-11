@@ -38,8 +38,8 @@ func New() *Server {
 	}
 	return s
 }
-func (s *Server) SetLogger(level logger.Level, format logger.Format) {
-	s.logger = logger.New(level, format)
+func (s *Server) SetLogger(logger *slog.Logger) {
+	s.logger = logger
 }
 func (s *Server) SetKeepAlive(interval time.Duration, timeout time.Duration) {
 	s.keepAlive = &struct {
@@ -50,6 +50,7 @@ func (s *Server) SetKeepAlive(interval time.Duration, timeout time.Duration) {
 		timeout:  timeout,
 	}
 }
+
 func (s *Server) Listen(ctx context.Context, port string) {
 	ctx, cancel := context.WithCancelCause(ctx)
 	listener, err := net.Listen("tcp", ":"+port)
@@ -81,7 +82,7 @@ func (s *Server) Shutdown(ctx context.Context) {
 }
 func (s *Server) SendData(data []byte, clientID string) error {
 	if conn, ok := s.conns.Get(clientID); ok {
-		return conn.sendPacket(packet.Data(data))
+		return conn.sendPacket(packet.NewData(data))
 	}
 	return fmt.Errorf("conn not found")
 }

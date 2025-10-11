@@ -57,7 +57,7 @@ func (c *Server) handleData(p *packet.DataPacket) (*packet.DataPacket, error) {
 		buf := buffer.New()
 		buf.WriteUInt8(1)
 		res.WriteTo(buf)
-		return packet.Data(buf.Bytes()), nil
+		return packet.NewData(buf.Bytes()), nil
 	}
 
 }

@@ -41,7 +41,7 @@ func New(host, port string) *Client {
 		keepalive: keepalive.New(60, 5),
 	}
 	c.keepalive.PingFunc(func() {
-		c.SendPacket(packet.Ping())
+		c.sendPacket(packet.NewPing())
 	})
 	c.keepalive.TimeoutFunc(func() {
 		c.logger.Error("keepalive timeout")
@@ -120,21 +120,20 @@ func (c *Client) reconnect() {
 		c.tryClose(err)
 		return
 	}
-	c.SendPacket(packet.Connect(c.identity))
+	c.sendPacket(packet.NewConnect(c.identity))
 }
 
 func (c *Client) SendData(data []byte) error {
-	dataPacket := packet.Data(data)
-	return c.SendPacket(dataPacket)
+	return c.sendPacket(packet.NewData(data))
 }
 
 func (c *Client) SendPing() error {
-	return c.SendPacket(packet.Ping())
+	return c.sendPacket(packet.NewPing())
 }
 func (c *Client) SendPong() error {
-	return c.SendPacket(packet.Pong())
+	return c.sendPacket(packet.NewPong())
 }
-func (c *Client) SendPacket(p packet.Packet) error {
+func (c *Client) sendPacket(p packet.Packet) error {
 	if c.conn == nil {
 		return ErrNotConnected
 	}
@@ -171,26 +170,28 @@ func (c *Client) setStatus(status Status) {
 	}
 }
 func (c *Client) handlePacket(p packet.Packet) {
-	c.logger.Info("receive packet", "packet", p.String())
-	switch p := p.(type) {
-	case *packet.ConnackPacket:
+	c.logger.Info("receive", "packet", p.String())
+	switch p.Type() {
+	case packet.CONNACK:
+		p := p.(*packet.ConnackPacket)
 		if p.Code != 0 {
 			return
 		}
 		c.safeSetStatus(StatusOpened)
-	case *packet.DataPacket:
+	case packet.DATA:
+		p := p.(*packet.DataPacket)
 		if c.dataHandler != nil {
 			err := c.dataHandler(p)
 			if err != nil {
 				c.logger.Error("data handler error", "error", err)
 			}
 		}
-	case *packet.PingPacket:
+	case packet.PING:
 		c.SendPong()
-	case *packet.PongPacket:
+	case packet.PONG:
 		c.keepalive.HandlePong()
-	case *packet.ClosePacket:
-		c.tryClose(p.Code)
+	case packet.CLOSE:
+		c.tryClose(p.(*packet.ClosePacket).Code)
 	default:
 
 	}

@@ -29,7 +29,7 @@ func (c *conn) connect(address string) error {
 }
 func (c *conn) receive() {
 	for {
-		p, err := packet.ReadPacket(c.raw)
+		p, err := packet.ReadFrom(c.raw)
 		if err != nil {
 			if c.errFunc != nil {
 				c.errFunc(err)
@@ -55,5 +55,5 @@ func (c *conn) sendPacket(p packet.Packet) error {
 	if c.raw == nil {
 		return ErrNotConnected
 	}
-	return packet.WritePacket(c.raw, p)
+	return packet.WriteTo(c.raw, p)
 }

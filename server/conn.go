@@ -59,7 +59,7 @@ func (c *conn) close(code packet.CloseCode) {
 		return
 	}
 	c.logger.Info("Close connection", "code", code)
-	c.sendPacket(packet.Close(code))
+	c.sendPacket(packet.NewClose(code))
 	c.raw.Close()
 	c.keepAlive.Stop()
 	close(c.authed)
@@ -87,7 +87,7 @@ func (c *conn) serve() {
 		}
 	}()
 	for {
-		packet, err := packet.ReadPacket(c.raw)
+		packet, err := packet.ReadFrom(c.raw)
 		if err != nil {
 			return
 		}
@@ -96,19 +96,19 @@ func (c *conn) serve() {
 }
 
 func (c *conn) connack(code packet.ConnectCode) error {
-	return c.sendPacket(packet.Connack(code))
+	return c.sendPacket(packet.NewConnack(code))
 }
 func (c *conn) sendPing() error {
-	return c.sendPacket(packet.Ping())
+	return c.sendPacket(packet.NewPing())
 }
 func (c *conn) sendPong() error {
-	return c.sendPacket(packet.Pong())
+	return c.sendPacket(packet.NewPong())
 }
 func (c *conn) sendPacket(p packet.Packet) error {
 	if c.raw == nil {
 		return fmt.Errorf("connection already closed")
 	}
-	return packet.WritePacket(c.raw, p)
+	return packet.WriteTo(c.raw, p)
 }
 func (c *conn) doAuth(id *packet.Identity) error {
 	c.mu.Lock()
@@ -134,9 +134,10 @@ func (c *conn) handlePacket(p packet.Packet) {
 	if c.closed() {
 		return
 	}
-	c.logger.Debug("handle packet", "packet", p.String())
-	switch p := p.(type) {
-	case *packet.ConnectPacket:
+	// c.logger.Debug("handle packet", "packet", p.String())
+	switch p.Type() {
+	case packet.CONNECT:
+		p := p.(*packet.ConnectPacket)
 		if p.Identity != nil {
 			err := c.doAuth(p.Identity)
 			if err != nil {
@@ -146,7 +147,8 @@ func (c *conn) handlePacket(p packet.Packet) {
 			}
 		}
 		c.connack(packet.ConnectionAccepted)
-	case *packet.DataPacket:
+	case packet.DATA:
+		p := p.(*packet.DataPacket)
 		res, err := c.server.dataHandler(p)
 		if err != nil {
 			c.logger.Error("data handler failed", "error", err)
@@ -155,12 +157,12 @@ func (c *conn) handlePacket(p packet.Packet) {
 		if res != nil {
 			c.sendPacket(res)
 		}
-	case *packet.PingPacket:
+	case packet.PING:
 		c.sendPong()
-	case *packet.PongPacket:
+	case packet.PONG:
 		c.keepAlive.HandlePong()
-	case *packet.ClosePacket:
-		c.close(p.Code)
+	case packet.CLOSE:
+		c.close(p.(*packet.ClosePacket).Code)
 	default:
 		break
 	}

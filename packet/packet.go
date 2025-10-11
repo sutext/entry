@@ -4,15 +4,14 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"reflect"
 
 	"sutext.github.io/entry/buffer"
 )
 
 const (
-	MIN_LEN uint32 = 0
-	MID_LEN uint32 = 0xfff
-	MAX_LEN uint32 = 0xfffffff
+	MIN_LEN int = 0
+	MID_LEN int = 0xfff
+	MAX_LEN int = 0xfffffff
 )
 
 type PacketType uint8
@@ -53,52 +52,35 @@ type Packet interface {
 	Equal(Packet) bool
 }
 
-type incomming struct {
-	packetType PacketType
-	data       []byte
+type pingpong struct {
+	t PacketType
 }
 
-func (i incomming) decode() (Packet, error) {
-	buf := buffer.New(i.data)
-	switch i.packetType {
-	case CONNECT:
-		conn := &ConnectPacket{}
-		err := conn.ReadFrom(buf)
-		if err != nil {
-			return nil, err
-		}
-		return conn, nil
-	case CONNACK:
-		connack := &ConnackPacket{}
-		err := connack.ReadFrom(buf)
-		if err != nil {
-			return nil, err
-		}
-		return connack, nil
-	case DATA:
-		data := &DataPacket{}
-		err := data.ReadFrom(buf)
-		if err != nil {
-			return nil, err
-		}
-		return data, nil
-	case PING:
-		return Ping(), nil
-	case PONG:
-		return Pong(), nil
-	case CLOSE:
-		close := &ClosePacket{}
-		err := close.ReadFrom(buf)
-		if err != nil {
-			return nil, err
-		}
-		return close, nil
-	default:
-		return nil, ErrUnkownPacketType
+func NewPing() Packet {
+	return &pingpong{t: PING}
+}
+func NewPong() Packet {
+	return &pingpong{t: PONG}
+}
+func (p *pingpong) Type() PacketType {
+	return p.t
+}
+func (p *pingpong) String() string {
+	return p.t.String()
+}
+func (p *pingpong) Equal(other Packet) bool {
+	if other == nil {
+		return false
 	}
+	return p.t == other.Type()
 }
-
-func ReadPacket(r io.Reader) (Packet, error) {
+func (p *pingpong) WriteTo(w *buffer.Buffer) error {
+	return nil
+}
+func (p *pingpong) ReadFrom(r *buffer.Buffer) error {
+	return nil
+}
+func ReadFrom(r io.Reader) (Packet, error) {
 	// read header
 	header := make([]byte, 2)
 	_, err := io.ReadFull(r, header)
@@ -122,31 +104,64 @@ func ReadPacket(r io.Reader) (Packet, error) {
 	if err != nil {
 		return nil, err
 	}
-	imcoming := incomming{packetType: packetType, data: data}
-	return imcoming.decode()
+	buf := buffer.New(data)
+	switch packetType {
+	case CONNECT:
+		conn := &ConnectPacket{}
+		err := conn.ReadFrom(buf)
+		if err != nil {
+			return nil, err
+		}
+		return conn, nil
+	case CONNACK:
+		connack := &ConnackPacket{}
+		err := connack.ReadFrom(buf)
+		if err != nil {
+			return nil, err
+		}
+		return connack, nil
+	case DATA:
+		data := &DataPacket{}
+		err := data.ReadFrom(buf)
+		if err != nil {
+			return nil, err
+		}
+		return data, nil
+	case PING:
+		return NewPing(), nil
+	case PONG:
+		return NewPong(), nil
+	case CLOSE:
+		close := &ClosePacket{}
+		err := close.ReadFrom(buf)
+		if err != nil {
+			return nil, err
+		}
+		return close, nil
+	default:
+		return nil, ErrUnkownPacketType
+	}
 }
-func WritePacket(w io.Writer, p Packet) error {
+func WriteTo(w io.Writer, p Packet) error {
 	buf := buffer.New()
 	err := p.WriteTo(buf)
 	if err != nil {
 		return err
 	}
-	// write header
-	length := uint32(buf.Len())
+	length := buf.Len()
 	if length > MAX_LEN {
 		return ErrPacketSizeTooLarge
 	}
 	var header []byte
 	if length > MID_LEN {
 		header = make([]byte, 4)
-		binary.BigEndian.PutUint32(header, length)
+		binary.BigEndian.PutUint32(header, uint32(length))
 		header[0] = byte(p.Type()<<5) | 0x10 | header[0]
 	} else {
 		header = make([]byte, 2)
 		binary.BigEndian.PutUint16(header, uint16(length))
 		header[0] = byte(p.Type()<<5) | header[0]
 	}
-	// write data
 	_, err = w.Write(header)
 	if err != nil {
 		return err
@@ -156,23 +171,4 @@ func WritePacket(w io.Writer, p Packet) error {
 		return err
 	}
 	return nil
-}
-
-type packet struct {
-	packetType PacketType
-	data       []byte
-}
-
-func (p packet) Type() PacketType {
-	return p.packetType
-}
-
-func (p packet) Equal(other packet) bool {
-	if p.packetType != other.Type() {
-		return false
-	}
-	return reflect.DeepEqual(p.data, other.data)
-}
-func (p packet) String() string {
-	return p.String()
 }

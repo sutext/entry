@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"math/rand/v2"
 	"time"
@@ -43,18 +42,19 @@ func addClient(count uint) {
 	}
 }
 func main() {
-	go func() {
-		timer := time.NewTimer(5 * time.Second)
-		ctx := context.Background()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-timer.C:
-				addClient(10)
-				timer.Reset(5 * time.Second)
-			}
-		}
-	}()
+	// go func() {
+	// 	timer := time.NewTimer(5 * time.Second)
+	// 	ctx := context.Background()
+	// 	for {
+	// 		select {
+	// 		case <-ctx.Done():
+	// 			return
+	// 		case <-timer.C:
+	// 			addClient(100)
+	// 			timer.Reset(5 * time.Second)
+	// 		}
+	// 	}
+	// }()
+	addClient(1000)
 	select {}
 }

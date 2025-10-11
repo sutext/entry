@@ -11,7 +11,7 @@ type DataPacket struct {
 	Payload []byte
 }
 
-func Data(payload []byte) *DataPacket {
+func NewData(payload []byte) *DataPacket {
 	return &DataPacket{
 		Payload: payload,
 	}

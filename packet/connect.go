@@ -6,10 +6,6 @@ import (
 	"sutext.github.io/entry/buffer"
 )
 
-const (
-	ConnectFlagIdentity uint8 = 0x01
-)
-
 type Identity struct {
 	UserID    string
 	ClientID  string
@@ -17,15 +13,10 @@ type Identity struct {
 }
 type ConnectPacket struct {
 	Identity *Identity
-	flag     uint8
 }
 
-func Connect(identity *Identity) *ConnectPacket {
-	var flag uint8 = 0
-	if identity != nil {
-		flag |= ConnectFlagIdentity
-	}
-	return &ConnectPacket{Identity: identity, flag: flag}
+func NewConnect(identity *Identity) *ConnectPacket {
+	return &ConnectPacket{Identity: identity}
 }
 func (p *ConnectPacket) String() string {
 	return fmt.Sprintf("CONNECT(uid=%s, cid=%s, token=%s)", p.Identity.UserID, p.Identity.ClientID, p.Identity.AuthToken)
@@ -43,12 +34,10 @@ func (p *ConnectPacket) Equal(other Packet) bool {
 	otherP := other.(*ConnectPacket)
 	return p.Identity.AuthToken == otherP.Identity.AuthToken &&
 		p.Identity.UserID == otherP.Identity.UserID &&
-		p.Identity.ClientID == otherP.Identity.ClientID &&
-		p.flag == otherP.flag
+		p.Identity.ClientID == otherP.Identity.ClientID
 }
 func (p *ConnectPacket) WriteTo(buffer *buffer.Buffer) error {
-	buffer.WriteUInt8(p.flag)
-	if p.flag&ConnectFlagIdentity != 0 {
+	if p.Identity != nil {
 		buffer.WriteString(p.Identity.AuthToken)
 		buffer.WriteString(p.Identity.UserID)
 		buffer.WriteString(p.Identity.ClientID)
@@ -56,29 +45,25 @@ func (p *ConnectPacket) WriteTo(buffer *buffer.Buffer) error {
 	return nil
 }
 func (p *ConnectPacket) ReadFrom(buffer *buffer.Buffer) error {
-	flag, err := buffer.ReadUInt8()
+	if buffer.Len() == 0 {
+		return nil
+	}
+	token, err := buffer.ReadString()
 	if err != nil {
 		return err
 	}
-	p.flag = flag
-	if flag&ConnectFlagIdentity != 0 {
-		token, err := buffer.ReadString()
-		if err != nil {
-			return err
-		}
-		userID, err := buffer.ReadString()
-		if err != nil {
-			return err
-		}
-		clientID, err := buffer.ReadString()
-		if err != nil {
-			return err
-		}
-		p.Identity = &Identity{
-			AuthToken: token,
-			UserID:    userID,
-			ClientID:  clientID,
-		}
+	userID, err := buffer.ReadString()
+	if err != nil {
+		return err
+	}
+	clientID, err := buffer.ReadString()
+	if err != nil {
+		return err
+	}
+	p.Identity = &Identity{
+		AuthToken: token,
+		UserID:    userID,
+		ClientID:  clientID,
 	}
 	return nil
 }
@@ -104,7 +89,7 @@ type ConnackPacket struct {
 	Code ConnectCode
 }
 
-func Connack(code ConnectCode) *ConnackPacket {
+func NewConnack(code ConnectCode) *ConnackPacket {
 	return &ConnackPacket{
 		Code: code,
 	}

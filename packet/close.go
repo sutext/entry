@@ -64,7 +64,7 @@ type ClosePacket struct {
 	Code CloseCode
 }
 
-func Close(code CloseCode) *ClosePacket {
+func NewClose(code CloseCode) *ClosePacket {
 	return &ClosePacket{Code: code}
 }
 func (p *ClosePacket) String() string {
