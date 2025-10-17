@@ -14,21 +14,28 @@ import (
 
 type DataHandler func(uid string, p *packet.DataPacket) (*packet.DataPacket, error)
 type AuthHandler func(p *packet.Identity) error
-type NIOServer struct {
+type Server interface {
+	Start() error
+	Shutdown(ctx context.Context) error
+	HandleAuth(handler AuthHandler)
+	HandleData(handler DataHandler)
+	SendData(data []byte, clientID string) error
+}
+
+type server struct {
 	port        string
 	conns       *safe.Map[string, netpoll.Connection]
-	groups      *safe.Map[string, []string]
 	logger      *slog.Logger
 	eventLoop   netpoll.EventLoop
 	dataHandler DataHandler
 	authHandler AuthHandler
 }
 
-func New(port string) *NIOServer {
-	s := &NIOServer{
+func New(port string) Server {
+
+	s := &server{
 		port:   port,
 		conns:  safe.NewMap(map[string]netpoll.Connection{}),
-		groups: safe.NewMap(map[string][]string{}),
 		logger: logger.New(logger.LevelDebug, logger.FormatJSON),
 		authHandler: func(p *packet.Identity) error {
 			return fmt.Errorf("login handler not set")
@@ -39,16 +46,16 @@ func New(port string) *NIOServer {
 	}
 	return s
 }
-func (s *NIOServer) SetLogger(level logger.Level, format logger.Format) {
+func (s *server) SetLogger(level logger.Level, format logger.Format) {
 	s.logger = logger.New(level, format)
 }
-func (s *NIOServer) HandleAuth(handler AuthHandler) {
+func (s *server) HandleAuth(handler AuthHandler) {
 	s.authHandler = handler
 }
-func (s *NIOServer) HandleData(handler DataHandler) {
+func (s *server) HandleData(handler DataHandler) {
 	s.dataHandler = handler
 }
-func (s *NIOServer) Start() error {
+func (s *server) Start() error {
 	ln, err := net.Listen("tcp", ":"+s.port)
 	if err != nil {
 		return err
@@ -69,26 +76,35 @@ func (s *NIOServer) Start() error {
 	}
 	return nil
 }
-func (s *NIOServer) Shutdown(ctx context.Context) error {
+func (s *server) Shutdown(ctx context.Context) error {
 	if s.eventLoop != nil {
 		return s.eventLoop.Shutdown(ctx)
 	}
 	return nil
 }
-func (s *NIOServer) close(clientID string, code packet.CloseCode) {
+func (s *server) close(clientID string, code packet.CloseCode) {
 	if conn, ok := s.conns.Get(clientID); ok {
 		packet.WriteTo(conn, packet.NewClose(code))
 		conn.Close()
 		s.conns.Delete(clientID)
 	}
 }
-func (s *NIOServer) sendPacket(clientID string, p packet.Packet) error {
+func (s *server) SendData(data []byte, clientID string) error {
+	if conn, ok := s.conns.Get(clientID); ok {
+		p := &packet.DataPacket{
+			Payload: data,
+		}
+		return packet.WriteTo(conn, p)
+	}
+	return fmt.Errorf("conn not found")
+}
+func (s *server) sendPacket(clientID string, p packet.Packet) error {
 	if conn, ok := s.conns.Get(clientID); ok {
 		return packet.WriteTo(conn, p)
 	}
 	return fmt.Errorf("conn not found")
 }
-func (s *NIOServer) handlePacket(id *packet.Identity, p packet.Packet) {
+func (s *server) handlePacket(id *packet.Identity, p packet.Packet) {
 	switch p.Type() {
 	case packet.DATA:
 		p := p.(*packet.DataPacket)
@@ -113,7 +129,7 @@ func (s *NIOServer) handlePacket(id *packet.Identity, p packet.Packet) {
 	}
 }
 
-func (s *NIOServer) onRequest(ctx context.Context, conn netpoll.Connection) error {
+func (s *server) onRequest(ctx context.Context, conn netpoll.Connection) error {
 	id := ctx.Value(identityKey).(*packet.Identity)
 	pkt, err := packet.ReadFrom(conn)
 	if err != nil {
@@ -124,10 +140,10 @@ func (s *NIOServer) onRequest(ctx context.Context, conn netpoll.Connection) erro
 	s.handlePacket(id, pkt)
 	return nil
 }
-func (s *NIOServer) onPrepare(conn netpoll.Connection) context.Context {
+func (s *server) onPrepare(conn netpoll.Connection) context.Context {
 	return context.Background()
 }
-func (s *NIOServer) onConnect(ctx context.Context, conn netpoll.Connection) context.Context {
+func (s *server) onConnect(ctx context.Context, conn netpoll.Connection) context.Context {
 	pkt, err := packet.ReadFrom(conn)
 	if err != nil {
 		conn.Close()
@@ -149,7 +165,7 @@ func (s *NIOServer) onConnect(ctx context.Context, conn netpoll.Connection) cont
 	s.sendPacket(connPacket.Identity.ClientID, packet.NewConnack(packet.ConnectionAccepted))
 	return context.WithValue(ctx, identityKey, connPacket.Identity)
 }
-func (s *NIOServer) onDisconnect(ctx context.Context, conn netpoll.Connection) {
+func (s *server) onDisconnect(ctx context.Context, conn netpoll.Connection) {
 	id, ok := ctx.Value(identityKey).(*packet.Identity)
 	if ok {
 		s.conns.Delete(id.ClientID)

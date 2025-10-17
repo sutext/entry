@@ -1,0 +1,31 @@
+syntax = "proto3";
+package proto;
+
+option go_package = "sutext.github.io/entry/api/proto";
+
+message CommonRes {
+    int32 code = 1;
+}
+
+message PublishReq {
+    int64 uid = 1;
+    string topic = 2;
+    bytes payload = 3;
+}
+
+message SubscribeReq {
+    int64 uid = 1;
+    repeated string topics = 2;
+
+}
+
+message UnsubscribeReq {
+    int64 uid = 1;
+    repeated string topics = 2;
+}
+
+service EntryService {
+    rpc Subscribe(SubscribeReq) returns (CommonRes);
+    rpc Unsubscribe(UnsubscribeReq) returns (CommonRes);
+    rpc Publish(PublishReq) returns (CommonRes);
+}

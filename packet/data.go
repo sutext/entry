@@ -8,6 +8,7 @@ import (
 )
 
 type DataPacket struct {
+	Group   string
 	Payload []byte
 }
 
@@ -31,19 +32,25 @@ func (p *DataPacket) Equal(other Packet) bool {
 		return false
 	}
 	otherData := other.(*DataPacket)
-	return reflect.DeepEqual(p.Payload, otherData.Payload)
+	return p.Group == otherData.Group && reflect.DeepEqual(p.Payload, otherData.Payload)
 }
 
 func (p *DataPacket) WriteTo(buf *buffer.Buffer) error {
+	buf.WriteString(p.Group)
 	buf.WriteBytes(p.Payload)
 	return nil
 }
 
 func (p *DataPacket) ReadFrom(buf *buffer.Buffer) error {
+	group, err := buf.ReadString()
+	if err != nil {
+		return err
+	}
 	payload, err := buf.ReadAll()
 	if err != nil {
 		return err
 	}
+	p.Group = group
 	p.Payload = payload
 	return nil
 }
