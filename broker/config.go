@@ -1,24 +1,25 @@
 package broker
 
 type Config struct {
-	Port  string
+	Addr  string
 	Grpc  GrpcConfig
 	Redis RedisConfig
 }
 
 type RedisConfig struct {
+	DB       int
 	Addr     string
 	Username string
 	Password string
-	DB       int
 }
+
 type GrpcConfig struct {
 	Addr string
 }
 
 func DefaultConfig() *Config {
 	return &Config{
-		Port: ":8080",
+		Addr: ":8080",
 		Grpc: GrpcConfig{
 			Addr: ":9090",
 		},

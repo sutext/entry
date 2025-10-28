@@ -8,28 +8,33 @@ import (
 	"syscall"
 	"time"
 
+	"sutext.github.io/entry"
 	"sutext.github.io/entry/logger"
-	"sutext.github.io/entry/nio"
 	"sutext.github.io/entry/packet"
-	"sutext.github.io/entry/server"
 )
 
 func main() {
-	runNIO()
-	// runServer()
-}
-func runServer() {
 	ctx := context.Background()
 	logger := logger.New(logger.LevelDebug, logger.FormatJSON)
-	s := server.New()
-	s.HandleAuth(func(p *packet.Identity) error {
+
+	s, err := entry.NewServer(entry.TCP(), ":8080")
+	// s, err := entry.NewServer(entry.QUIC(&quic.Config{
+	// 	TLSConfig:            &tls.Config{InsecureSkipVerify: true},
+	// 	MaxBidiRemoteStreams: 1,
+	// 	MaxIdleTimeout:       5 * time.Second,
+	// 	MaxUniRemoteStreams:  1,
+	// }), ":8080")
+	if err != nil {
+		logger.Error("listen", "error", err)
+		os.Exit(1)
+	}
+
+	s.OnAuth(func(p *packet.Identity) error {
 		return nil
 	})
-	s.HandleData(func(p *packet.DataPacket) (*packet.DataPacket, error) {
+	s.OnData(func(cid string, p *packet.DataPacket) (*packet.DataPacket, error) {
 		return nil, nil
 	})
-	s.SetLogger(logger)
-	s.SetKeepAlive(time.Second*60, time.Second*5)
 	logger.InfoContext(ctx, "entry server start")
 	ctx, cancel := context.WithCancelCause(ctx)
 	sigs := make(chan os.Signal, 1)
@@ -39,7 +44,11 @@ func runServer() {
 		logger.InfoContext(ctx, "entry signal received")
 		cancel(fmt.Errorf("entry signal received"))
 	}()
-	go s.Listen(ctx, "8080")
+	go func() {
+		if err := s.Serve(); err != nil {
+			cancel(err)
+		}
+	}()
 	<-ctx.Done()
 	logger.InfoContext(ctx, "entry server start graceful shutdown")
 	done := make(chan struct{})
@@ -55,14 +64,4 @@ func runServer() {
 	case <-done:
 		logger.DebugContext(ctx, "entry server graceful shutdown")
 	}
-}
-func runNIO() {
-	s := nio.New("8080")
-	s.HandleAuth(func(p *packet.Identity) error {
-		return nil
-	})
-	s.HandleData(func(uid string, p *packet.DataPacket) (*packet.DataPacket, error) {
-		return nil, nil
-	})
-	s.Start()
 }

@@ -1,51 +1,64 @@
 package entry
 
 import (
-	"context"
 	"fmt"
-	"log/slog"
-	"os"
-	"os/signal"
-	"syscall"
-	"time"
 
+	qc "golang.org/x/net/quic"
+	"sutext.github.io/entry/broker"
+	"sutext.github.io/entry/internal/server/bio"
+	"sutext.github.io/entry/internal/server/nio"
+	"sutext.github.io/entry/internal/server/quic"
 	"sutext.github.io/entry/server"
 )
 
-type Entry struct {
-	logger *slog.Logger
+func TCP() Transport {
+	return &tcpTransport{"tcp"}
+}
+func NIOTCP() Transport {
+	return &tcpTransport{"nio"}
+}
+func QUIC(config *qc.Config) Transport {
+	return &quicTransport{config}
 }
 
-func (e *Entry) ListenAndServe(ctx context.Context) error {
-	e.logger.InfoContext(ctx, "entry server start")
-	ctx, cancel := context.WithCancelCause(ctx)
-	server := server.New()
-	done := make(chan struct{})
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-	go func() {
-		<-sigs
-		cancel(fmt.Errorf("entry signal received"))
-	}()
-	go func() {
-		defer close(done)
-		<-ctx.Done()
-		server.Shutdown(ctx)
-		// s.tcpListener.shutdown(ctx)
-		// s.peerListener.shutdown(ctx)
-	}()
+type Transport interface {
+	Network() string
+	quicConfig() *qc.Config
+}
 
-	// go s.tcpListener.listen(ctx)
-	// go s.peerListener.listen(ctx)
-	<-ctx.Done()
-	e.logger.InfoContext(ctx, "entry server stoped")
-	timeout := time.NewTimer(time.Second * 15)
-	defer timeout.Stop()
-	select {
-	case <-timeout.C:
-		e.logger.WarnContext(ctx, "entry server graceful shutdown timeout")
-	case <-done:
-		e.logger.DebugContext(ctx, "entry server graceful shutdown")
+type tcpTransport struct {
+	network string
+}
+
+func (t *tcpTransport) Network() string {
+	return t.network
+}
+func (t *tcpTransport) quicConfig() *qc.Config {
+	return nil
+}
+
+type quicTransport struct {
+	config *qc.Config
+}
+
+func (t *quicTransport) Network() string {
+	return "quic"
+}
+func (t *quicTransport) quicConfig() *qc.Config {
+	return t.config
+}
+func NewServer(transport Transport, address string) (server.Server, error) {
+	switch transport.Network() {
+	case "tcp":
+		return bio.NewBIO(address), nil
+	case "nio":
+		return nio.NewNIO(address), nil
+	case "quic":
+		return quic.NewQUIC(address, transport.quicConfig()), nil
+	default:
+		return nil, fmt.Errorf("")
 	}
-	return context.Cause(ctx)
+}
+func NewBroker(config *broker.Config) broker.Broker {
+	return broker.New()
 }

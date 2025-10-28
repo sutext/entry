@@ -7,27 +7,27 @@ import (
 	"sync"
 	"time"
 
-	"sutext.github.io/entry/backoff"
-	"sutext.github.io/entry/keepalive"
+	"sutext.github.io/entry/internal/backoff"
+	"sutext.github.io/entry/internal/keepalive"
 	"sutext.github.io/entry/logger"
 	"sutext.github.io/entry/packet"
 )
 
 var ErrNotConnected = errors.New("not connected")
 
-type DataHandler func(p *packet.DataPacket) error
+type OnData func(p *packet.DataPacket) error
 type Client struct {
-	mu          *sync.RWMutex
-	conn        *conn
-	host        string
-	port        string
-	status      Status
-	logger      *slog.Logger
-	retrier     *Retrier
-	identity    *packet.Identity
-	retrying    bool
-	keepalive   *keepalive.KeepAlive
-	dataHandler DataHandler
+	mu        *sync.RWMutex
+	conn      *conn
+	host      string
+	port      string
+	onData    OnData
+	status    Status
+	logger    *slog.Logger
+	retrier   *Retrier
+	identity  *packet.Identity
+	retrying  bool
+	keepalive *keepalive.KeepAlive
 }
 
 func New(host, port string) *Client {
@@ -49,6 +49,9 @@ func New(host, port string) *Client {
 	})
 	return c
 }
+func (c *Client) OnData(f OnData) {
+	c.onData = f
+}
 func (c *Client) SetLogger(level logger.Level, format logger.Format) {
 	c.logger = logger.New(level, format)
 }
@@ -57,9 +60,6 @@ func (c *Client) SetRetrier(limit int, backoff backoff.Backoff) {
 }
 func (c *Client) SetKeepAlive(interval time.Duration, timeout time.Duration) {
 	c.keepalive = keepalive.New(interval, timeout)
-}
-func (c *Client) HandleData(handler DataHandler) {
-	c.dataHandler = handler
 }
 func (c *Client) Connect(identity *packet.Identity) {
 	c.identity = identity
@@ -180,8 +180,8 @@ func (c *Client) handlePacket(p packet.Packet) {
 		c.safeSetStatus(StatusOpened)
 	case packet.DATA:
 		p := p.(*packet.DataPacket)
-		if c.dataHandler != nil {
-			err := c.dataHandler(p)
+		if c.onData != nil {
+			err := c.onData(p)
 			if err != nil {
 				c.logger.Error("data handler error", "error", err)
 			}

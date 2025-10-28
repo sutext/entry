@@ -12,7 +12,9 @@ type Identity struct {
 	AuthToken string
 }
 type ConnectPacket struct {
-	Identity *Identity
+	Version   string
+	KeepAlive uint16
+	Identity  *Identity
 }
 
 func NewConnect(identity *Identity) *ConnectPacket {
@@ -100,10 +102,6 @@ func (p *ConnackPacket) String() string {
 func (P *ConnackPacket) Type() PacketType {
 	return CONNACK
 }
-func (p *ConnackPacket) WriteTo(buffer *buffer.Buffer) error {
-	buffer.WriteUInt16(uint16(p.Code))
-	return nil
-}
 func (p *ConnackPacket) Equal(other Packet) bool {
 	if other == nil {
 		return false
@@ -113,6 +111,10 @@ func (p *ConnackPacket) Equal(other Packet) bool {
 	}
 	otherP := other.(*ConnackPacket)
 	return p.Code == otherP.Code
+}
+func (p *ConnackPacket) WriteTo(buffer *buffer.Buffer) error {
+	buffer.WriteUInt16(uint16(p.Code))
+	return nil
 }
 func (p *ConnackPacket) ReadFrom(buffer *buffer.Buffer) error {
 	code, err := buffer.ReadUInt16()

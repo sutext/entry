@@ -8,7 +8,8 @@ import (
 )
 
 type DataPacket struct {
-	Group   string
+	Channel string
+	Catgory uint8
 	Payload []byte
 }
 
@@ -32,17 +33,22 @@ func (p *DataPacket) Equal(other Packet) bool {
 		return false
 	}
 	otherData := other.(*DataPacket)
-	return p.Group == otherData.Group && reflect.DeepEqual(p.Payload, otherData.Payload)
+	return p.Channel == otherData.Channel && reflect.DeepEqual(p.Payload, otherData.Payload)
 }
 
 func (p *DataPacket) WriteTo(buf *buffer.Buffer) error {
-	buf.WriteString(p.Group)
+	buf.WriteString(p.Channel)
+	buf.WriteUInt8(p.Catgory)
 	buf.WriteBytes(p.Payload)
 	return nil
 }
 
 func (p *DataPacket) ReadFrom(buf *buffer.Buffer) error {
-	group, err := buf.ReadString()
+	channel, err := buf.ReadString()
+	if err != nil {
+		return err
+	}
+	catgory, err := buf.ReadUInt8()
 	if err != nil {
 		return err
 	}
@@ -50,7 +56,8 @@ func (p *DataPacket) ReadFrom(buf *buffer.Buffer) error {
 	if err != nil {
 		return err
 	}
-	p.Group = group
+	p.Catgory = catgory
+	p.Channel = channel
 	p.Payload = payload
 	return nil
 }

@@ -8,18 +8,11 @@ type Set[Value comparable] struct {
 }
 
 func NewSet[Value comparable](v ...Value) *Set[Value] {
-	switch len(v) {
-	case 0:
-		return &Set[Value]{
-			mp: make(map[Value]struct{}),
-		}
-	case 1:
-		return &Set[Value]{
-			mp: map[Value]struct{}{v[0]: {}},
-		}
-	default:
-		panic("too many arguments")
+	mp := make(map[Value]struct{})
+	for _, value := range v {
+		mp[value] = struct{}{}
 	}
+	return &Set[Value]{mp: mp}
 }
 func (s *Set[Value]) Has(value Value) bool {
 	s.mu.RLock()
@@ -33,7 +26,7 @@ func (s *Set[Value]) Add(value Value) {
 	s.mp[value] = struct{}{}
 }
 
-func (s *Set[Value]) Remove(value Value) {
+func (s *Set[Value]) Del(value Value) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.mp, value)
@@ -42,4 +35,13 @@ func (s *Set[Value]) Len() int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	return len(s.mp)
+}
+func (s *Set[Value]) Range(f func(Value) bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for key := range s.mp {
+		if !f(key) {
+			break
+		}
+	}
 }

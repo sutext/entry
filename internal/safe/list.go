@@ -10,7 +10,7 @@ type List[Value any] struct {
 	items []Value
 }
 
-func NewList[S ~[]Value, Value any](raw ...S) *List[Value] {
+func NewList[Value any](raw ...[]Value) *List[Value] {
 	switch len(raw) {
 	case 0:
 		return &List[Value]{items: []Value{}}
@@ -84,18 +84,11 @@ func (l *List[Value]) Range(f func(Value) bool) {
 		}
 	}
 }
-func (l *List[Value]) ForEach(f func(Value)) {
-	l.mu.RLock()
-	defer l.mu.RUnlock()
-	for _, item := range l.items {
-		f(item)
-	}
-}
 
 func (l *List[Value]) Clone() *List[Value] {
 	l.mu.RLock()
 	defer l.mu.RUnlock()
-	list := NewList[[]Value]()
+	list := NewList[Value]()
 	list.items = slices.Clone(l.items)
 	return list
 }

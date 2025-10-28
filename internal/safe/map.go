@@ -10,7 +10,7 @@ type Map[Key comparable, Value any] struct {
 	mp map[Key]Value
 }
 
-func NewMap[M ~map[Key]Value, Key comparable, Value any](raw ...M) *Map[Key, Value] {
+func NewMap[Key comparable, Value any](raw ...map[Key]Value) *Map[Key, Value] {
 	switch len(raw) {
 	case 0:
 		return &Map[Key, Value]{
@@ -103,7 +103,7 @@ func (m *Map[Key, Value]) IsEmpty() bool {
 func (m *Map[Key, Value]) Copy() *Map[Key, Value] {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	newMap := NewMap[map[Key]Value]()
+	newMap := NewMap[Key, Value]()
 	maps.Copy(newMap.mp, m.mp)
 	return newMap
 }
@@ -115,12 +115,10 @@ func (m *Map[Key, Value]) Merge(other *Map[Key, Value]) {
 func (m *Map[Key, Value]) Union(other *Map[Key, Value]) *Map[Key, Value] {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	unionMap := NewMap[map[Key]Value]()
-	maps.Copy(unionMap.mp, m.mp)
+	unionMap := NewMap(m.mp)
 	maps.Copy(unionMap.mp, other.mp)
 	return unionMap
 }
-
 func (m *Map[Key, Value]) Range(f func(key Key, value Value) bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -130,16 +128,10 @@ func (m *Map[Key, Value]) Range(f func(key Key, value Value) bool) {
 		}
 	}
 }
-func (m *Map[Key, Value]) ForEach(f func(key Key, value Value)) {
-	m.Range(func(key Key, value Value) bool {
-		f(key, value)
-		return true
-	})
-}
 func (m *Map[Key, Value]) Filter(f func(key Key, value Value) bool) *Map[Key, Value] {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	newMap := NewMap[map[Key]Value]()
+	newMap := NewMap[Key, Value]()
 	for key, value := range m.mp {
 		if f(key, value) {
 			newMap.Set(key, value)

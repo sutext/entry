@@ -1,4 +1,4 @@
-package server
+package bio
 
 import (
 	"context"
