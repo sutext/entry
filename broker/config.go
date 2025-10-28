@@ -1,8 +1,8 @@
 package broker
 
 type Config struct {
+	Peer  PeerConfig
 	Addr  string
-	Grpc  GrpcConfig
 	Redis RedisConfig
 }
 
@@ -13,16 +13,16 @@ type RedisConfig struct {
 	Password string
 }
 
-type GrpcConfig struct {
+type PeerConfig struct {
 	Addr string
 }
 
 func DefaultConfig() *Config {
 	return &Config{
-		Addr: ":8080",
-		Grpc: GrpcConfig{
+		Peer: PeerConfig{
 			Addr: ":9090",
 		},
+		Addr: ":8080",
 		Redis: RedisConfig{
 			Addr:     "localhost:6379",
 			Username: "",
