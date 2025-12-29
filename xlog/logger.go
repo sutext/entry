@@ -14,18 +14,18 @@ func init() {
 }
 
 func Debug(msg string, fields ...slog.Attr) {
-	Defualt().Debug(msg, fields...)
+	Defualt().Debug(context.Background(), msg, fields...)
 }
 
 func Info(msg string, fields ...slog.Attr) {
-	Defualt().Info(msg, fields...)
+	Defualt().Info(context.Background(), msg, fields...)
 }
 
 func Warn(msg string, fields ...slog.Attr) {
-	Defualt().Warn(msg, fields...)
+	Defualt().Warn(context.Background(), msg, fields...)
 }
 func Error(msg string, fields ...slog.Attr) {
-	Defualt().Error(msg, fields...)
+	Defualt().Error(context.Background(), msg, fields...)
 }
 
 type Logger struct {
@@ -115,29 +115,31 @@ func (l *Logger) WithLevel(level slog.Level) *Logger {
 	}
 	return NewText(level)
 }
-func (l *Logger) Debug(msg string, fields ...slog.Attr) {
-	l.s.LogAttrs(context.Background(), slog.LevelDebug, msg, fields...)
+func (l *Logger) Debug(ctx context.Context, msg string, fields ...slog.Attr) {
+	l.s.LogAttrs(ctx, slog.LevelDebug, msg, fields...)
 }
 
-func (l *Logger) Info(msg string, fields ...slog.Attr) {
-	l.s.LogAttrs(context.Background(), slog.LevelInfo, msg, fields...)
+func (l *Logger) Info(ctx context.Context, msg string, fields ...slog.Attr) {
+	l.s.LogAttrs(ctx, slog.LevelInfo, msg, fields...)
 }
 
-func (l *Logger) Warn(msg string, fields ...slog.Attr) {
-	l.s.LogAttrs(context.Background(), slog.LevelWarn, msg, fields...)
+func (l *Logger) Warn(ctx context.Context, msg string, fields ...slog.Attr) {
+	l.s.LogAttrs(ctx, slog.LevelWarn, msg, fields...)
 }
-func (l *Logger) Error(msg string, fields ...slog.Attr) {
-	l.s.LogAttrs(context.Background(), slog.LevelError, msg, fields...)
+func (l *Logger) Error(ctx context.Context, msg string, fields ...slog.Attr) {
+	l.s.LogAttrs(ctx, slog.LevelError, msg, fields...)
 }
 
-type requestContextKey struct{}
+type remoteIpKey struct{}
+type requestIdKey struct{}
+
 type requestContextHandler struct {
 	handler slog.Handler
 }
 
 var (
-	KeyRequestID              = requestContextKey{}
-	KeyRemoteIP               = requestContextKey{}
+	KeyRequestID              = requestIdKey{}
+	KeyRemoteIP               = remoteIpKey{}
 	_            slog.Handler = requestContextHandler{}
 )
 

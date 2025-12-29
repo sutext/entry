@@ -26,7 +26,7 @@ func newOptions(opts ...Option) *options {
 	os := &options{
 		addr:   ":8080",
 		dirver: nil,
-		logger: xlog.With("GROUP", "SERVER"),
+		logger: xlog.WithLevel(xlog.LevelInfo),
 	}
 	for _, o := range opts {
 		o.apply(os)

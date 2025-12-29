@@ -21,13 +21,16 @@ import (
 type Server interface {
 	Serve() error
 	Shoutdown(ctx context.Context) error
+	HandleFunc(p string, h http.HandlerFunc)
+	HandleCORS(p string, h http.HandlerFunc)
+	HandlePrefix(p string, h http.Handler)
 }
 type server struct {
 	db                     model.Storage
 	mux                    *mux.Router
 	dirver                 model.Driver
 	logger                 *xlog.Logger
-	issuerURL              *url.URL
+	issuerURL              url.URL
 	allHeaders             http.Header
 	realIPHeader           string
 	allowedOrigins         []string
@@ -48,7 +51,7 @@ func New(opts ...Option) Server {
 		mux:                    mux.NewRouter(),
 		dirver:                 options.dirver,
 		logger:                 options.logger,
-		issuerURL:              issuerURL,
+		issuerURL:              *issuerURL,
 		allHeaders:             options.allHeaders,
 		realIPHeader:           options.realIPHeader,
 		allowedOrigins:         options.allowedOrigins,
@@ -66,9 +69,9 @@ func (s *server) Serve() error {
 	}
 	s.db = db
 	s.mux.NotFoundHandler = http.NotFoundHandler()
-	s.handleCORS("/", s.handleRoot)
-	s.handleCORS("/.well-known/openid-configuration", s.handleDiscovery)
-	s.logger.Info("Server started")
+	s.HandleCORS("/", s.handleRoot)
+	s.HandleCORS("/.well-known/openid-configuration", s.handleDiscovery)
+	s.logger.Info(context.Background(), "Server started")
 	http.ListenAndServe(":8080", s.mux)
 	return nil
 }
@@ -83,15 +86,15 @@ func (s *server) handleRoot(w http.ResponseWriter, r *http.Request) {
 		<h3>A Federated OpenID Connect Provider</h3>
 		<p><a href=%q>Discovery</a></p>`, s.absURL("/.well-known/openid-configuration"))
 	if err != nil {
-		s.logger.Error("failed to write response", xlog.Err(err))
+		s.logger.Error(r.Context(), "failed to write response", xlog.Err(err))
 		// s.renderError(r, w, http.StatusInternalServerError, "Handling the / path error.")
 		return
 	}
 }
-func (s *server) handleFunc(p string, handler http.HandlerFunc) {
-	s.mux.Handle(path.Join(s.issuerURL.Path, p), s.handlerWithHeaders(p, handler))
+func (s *server) HandleFunc(p string, h http.HandlerFunc) {
+	s.mux.Handle(path.Join(s.issuerURL.Path, p), s.handlerWithHeaders(p, h))
 }
-func (s *server) handleCORS(p string, h http.HandlerFunc) {
+func (s *server) HandleCORS(p string, h http.HandlerFunc) {
 	var handler http.Handler = h
 	if len(s.allowedOrigins) > 0 {
 		cors := handlers.CORS(
@@ -102,7 +105,7 @@ func (s *server) handleCORS(p string, h http.HandlerFunc) {
 	}
 	s.mux.Handle(path.Join(s.issuerURL.Path, p), s.handlerWithHeaders(p, handler))
 }
-func (s *server) handlePrefix(p string, h http.Handler) {
+func (s *server) HandlePrefix(p string, h http.Handler) {
 	prefix := path.Join(s.issuerURL.Path, p)
 	s.mux.PathPrefix(prefix).Handler(http.StripPrefix(prefix, h))
 }
