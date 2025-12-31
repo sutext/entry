@@ -28,8 +28,8 @@ type Server interface {
 type server struct {
 	db                     model.Storage
 	mux                    *mux.Router
-	dirver                 model.Driver
 	logger                 *xlog.Logger
+	dirver                 model.Driver
 	issuerURL              url.URL
 	allHeaders             http.Header
 	realIPHeader           string
@@ -49,8 +49,8 @@ func New(opts ...Option) Server {
 	}
 	s := &server{
 		mux:                    mux.NewRouter(),
-		dirver:                 options.dirver,
 		logger:                 options.logger,
+		dirver:                 options.dirver,
 		issuerURL:              *issuerURL,
 		allHeaders:             options.allHeaders,
 		realIPHeader:           options.realIPHeader,
@@ -191,7 +191,6 @@ func (s *server) absURL(pathItems ...string) string {
 	u.Path = s.absPath(pathItems...)
 	return u.String()
 }
-
 func (s *server) absPath(pathItems ...string) string {
 	paths := make([]string, len(pathItems)+1)
 	paths[0] = s.issuerURL.Path
