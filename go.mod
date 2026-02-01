@@ -3,7 +3,6 @@ module sutext.github.io/entry
 go 1.25.2
 
 require (
-	github.com/go-jose/go-jose/v4 v4.1.3
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/handlers v1.5.2
 	github.com/gorilla/mux v1.8.1
@@ -13,6 +12,7 @@ require (
 	gorm.io/driver/postgres v1.6.0
 	gorm.io/driver/sqlite v1.6.0
 	gorm.io/gorm v1.31.1
+	sutext.github.io/jose v0.0.0-20260201050710-a0adf6921e23
 	sutext.github.io/suid v1.4.0
 )
 

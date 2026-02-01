@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"sort"
-	"strconv"
 )
 
 type discovery struct {
@@ -35,7 +34,6 @@ func (s *server) handleDiscovery(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
 	w.Write(data)
 }
 func (s *server) constructDiscovery() discovery {

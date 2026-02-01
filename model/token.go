@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/go-jose/go-jose/v4"
 	"sutext.github.io/entry/scope"
+	"sutext.github.io/jose"
 	"sutext.github.io/suid"
 )
 
