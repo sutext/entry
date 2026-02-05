@@ -9,11 +9,8 @@ import (
 	"net/url"
 	"path"
 
-	"github.com/google/uuid"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"sutext.github.io/entry/model"
 	"sutext.github.io/entry/xlog"
 )
@@ -36,7 +33,6 @@ type server struct {
 	allowedOrigins         []string
 	allowedHeaders         []string
 	trustedRealIPCIDRs     []*netip.Prefix
-	prometheusRegistry     *prometheus.Registry
 	supportedGrantTypes    []string
 	supportedResponseTypes map[string]bool
 }
@@ -72,7 +68,8 @@ func (s *server) Serve() error {
 	s.HandleCORS("/", s.handleRoot)
 	s.HandleCORS("/.well-known/openid-configuration", s.handleDiscovery)
 	s.HandleFunc("/token", s.handleToken)
-	s.logger.Info(context.Background(), "Server started")
+	s.HandleFunc("/auth", s.handleAuth)
+	s.logger.Info("Server started")
 	http.ListenAndServe(":8080", s.mux)
 	return nil
 }
@@ -87,13 +84,13 @@ func (s *server) handleRoot(w http.ResponseWriter, r *http.Request) {
 		<h3>A Federated OpenID Connect Provider</h3>
 		<p><a href=%q>Discovery</a></p>`, s.absURL("/.well-known/openid-configuration"))
 	if err != nil {
-		s.logger.Error(r.Context(), "failed to write response", xlog.Err(err))
+		s.logger.Error("failed to write response", xlog.Ctx(r.Context()), xlog.Err(err))
 		// s.renderError(r, w, http.StatusInternalServerError, "Handling the / path error.")
 		return
 	}
 }
 func (s *server) HandleFunc(p string, h http.HandlerFunc) {
-	s.mux.Handle(path.Join(s.issuerURL.Path, p), s.handlerWithHeaders(p, h))
+	s.mux.Handle(path.Join(s.issuerURL.Path, p), h)
 }
 func (s *server) HandleCORS(p string, h http.HandlerFunc) {
 	var handler http.Handler = h
@@ -104,66 +101,13 @@ func (s *server) HandleCORS(p string, h http.HandlerFunc) {
 		)
 		handler = cors(handler)
 	}
-	s.mux.Handle(path.Join(s.issuerURL.Path, p), s.handlerWithHeaders(p, handler))
+	s.mux.Handle(path.Join(s.issuerURL.Path, p), handler)
 }
 func (s *server) HandlePrefix(p string, h http.Handler) {
 	prefix := path.Join(s.issuerURL.Path, p)
 	s.mux.PathPrefix(prefix).Handler(http.StripPrefix(prefix, h))
 }
-func (s *server) handlerWithHeaders(handlerName string, handler http.Handler) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		for k, v := range s.allHeaders {
-			w.Header()[k] = v
-		}
-		// Context values are used for logging purposes with the log/slog logger.
-		rCtx := r.Context()
-		rCtx = context.WithValue(rCtx, xlog.KeyRequestID, uuid.NewString())
 
-		if s.realIPHeader != "" {
-			realIP, err := s.parseRealIP(r)
-			if err == nil {
-				rCtx = context.WithValue(rCtx, xlog.KeyRemoteIP, realIP)
-			}
-		}
-		instrumentHandler := func(_ string, handler http.Handler) http.HandlerFunc {
-			return handler.ServeHTTP
-		}
-		r = r.WithContext(rCtx)
-		if s.prometheusRegistry != nil {
-			requestCounter := prometheus.NewCounterVec(prometheus.CounterOpts{
-				Name: "http_requests_total",
-				Help: "Count of all HTTP requests.",
-			}, []string{"code", "method", "handler"})
-
-			durationHist := prometheus.NewHistogramVec(prometheus.HistogramOpts{
-				Name:    "request_duration_seconds",
-				Help:    "A histogram of latencies for requests.",
-				Buckets: []float64{.25, .5, 1, 2.5, 5, 10},
-			}, []string{"code", "method", "handler"})
-
-			sizeHist := prometheus.NewHistogramVec(prometheus.HistogramOpts{
-				Name:    "response_size_bytes",
-				Help:    "A histogram of response sizes for requests.",
-				Buckets: []float64{200, 500, 900, 1500},
-			}, []string{"code", "method", "handler"})
-
-			s.prometheusRegistry.MustRegister(requestCounter, durationHist, sizeHist)
-
-			instrumentHandler = func(handlerName string, handler http.Handler) http.HandlerFunc {
-				return promhttp.InstrumentHandlerDuration(
-					durationHist.MustCurryWith(prometheus.Labels{"handler": handlerName}),
-					promhttp.InstrumentHandlerCounter(
-						requestCounter.MustCurryWith(prometheus.Labels{"handler": handlerName}),
-						promhttp.InstrumentHandlerResponseSize(
-							sizeHist.MustCurryWith(prometheus.Labels{"handler": handlerName}),
-							handler),
-					),
-				)
-			}
-		}
-		instrumentHandler(handlerName, handler)(w, r)
-	}
-}
 func (s *server) parseRealIP(r *http.Request) (string, error) {
 	remoteAddr, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {

@@ -26,7 +26,6 @@ type discovery struct {
 }
 
 func (s *server) handleDiscovery(w http.ResponseWriter, r *http.Request) {
-	s.logger.Info(r.Context(), "handleDiscovery")
 	d := s.constructDiscovery()
 	data, err := json.MarshalIndent(d, "", "  ")
 	if err != nil {
