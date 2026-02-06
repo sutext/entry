@@ -67,8 +67,8 @@ func (s *server) Serve() error {
 	s.mux.NotFoundHandler = http.NotFoundHandler()
 	s.HandleCORS("/", s.handleRoot)
 	s.HandleCORS("/.well-known/openid-configuration", s.handleDiscovery)
-	s.HandleFunc("/token", s.handleToken)
-	s.HandleFunc("/auth", s.handleAuth)
+	// s.HandleFunc("/token", s.handleToken)
+	// s.HandleFunc("/auth", s.handleAuth)
 	s.logger.Info("Server started")
 	http.ListenAndServe(":8080", s.mux)
 	return nil
