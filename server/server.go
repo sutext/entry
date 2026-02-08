@@ -3,8 +3,10 @@ package server
 import (
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
+	"net/http/httputil"
 	"net/netip"
 	"net/url"
 	"path"
@@ -12,6 +14,7 @@ import (
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"sutext.github.io/entry/model"
+	"sutext.github.io/entry/xerr"
 	"sutext.github.io/entry/xlog"
 )
 
@@ -23,18 +26,21 @@ type Server interface {
 	HandlePrefix(p string, h http.Handler)
 }
 type server struct {
-	db                     model.Storage
-	mux                    *mux.Router
-	logger                 *xlog.Logger
-	dirver                 model.Driver
-	issuerURL              url.URL
-	allHeaders             http.Header
-	realIPHeader           string
-	allowedOrigins         []string
-	allowedHeaders         []string
-	trustedRealIPCIDRs     []*netip.Prefix
-	supportedGrantTypes    []string
-	supportedResponseTypes map[string]bool
+	db                            model.Storage
+	mux                           *mux.Router
+	logger                        *xlog.Logger
+	dirver                        model.Driver
+	issuerURL                     url.URL
+	forcePKCE                     bool
+	allHeaders                    http.Header
+	realIPHeader                  string
+	allowedOrigins                []string
+	allowedHeaders                []string
+	trustedRealIPCIDRs            []*netip.Prefix
+	internalErrorHandler          func(error) *xerr.Response
+	supportedGrantTypes           map[string]struct{}
+	supportedResponseTypes        map[string]struct{}
+	supportedCodeChallengeMethods map[string]struct{}
 }
 
 func New(opts ...Option) Server {
@@ -44,17 +50,18 @@ func New(opts ...Option) Server {
 		panic(err)
 	}
 	s := &server{
-		mux:                    mux.NewRouter(),
-		logger:                 options.logger,
-		dirver:                 options.dirver,
-		issuerURL:              *issuerURL,
-		allHeaders:             options.allHeaders,
-		realIPHeader:           options.realIPHeader,
-		allowedOrigins:         options.allowedOrigins,
-		allowedHeaders:         options.allowedHeaders,
-		trustedRealIPCIDRs:     options.trustedRealIPCIDRs,
-		supportedGrantTypes:    options.supportedGrantTypes,
-		supportedResponseTypes: options.supportedResponseTypes,
+		mux:                           mux.NewRouter(),
+		logger:                        options.logger,
+		dirver:                        options.dirver,
+		issuerURL:                     *issuerURL,
+		allHeaders:                    options.allHeaders,
+		realIPHeader:                  options.realIPHeader,
+		allowedOrigins:                options.allowedOrigins,
+		allowedHeaders:                options.allowedHeaders,
+		trustedRealIPCIDRs:            options.trustedRealIPCIDRs,
+		supportedGrantTypes:           options.supportedGrantTypes,
+		supportedResponseTypes:        options.supportedResponseTypes,
+		supportedCodeChallengeMethods: options.supportedCodeChallengeMethods,
 	}
 	return s
 }
@@ -68,7 +75,7 @@ func (s *server) Serve() error {
 	s.HandleCORS("/", s.handleRoot)
 	s.HandleCORS("/.well-known/openid-configuration", s.handleDiscovery)
 	// s.HandleFunc("/token", s.handleToken)
-	// s.HandleFunc("/auth", s.handleAuth)
+	s.HandleFunc("/authorize", s.handleAuthorize)
 	s.logger.Info("Server started")
 	http.ListenAndServe(":8080", s.mux)
 	return nil
@@ -107,7 +114,15 @@ func (s *server) HandlePrefix(p string, h http.Handler) {
 	prefix := path.Join(s.issuerURL.Path, p)
 	s.mux.PathPrefix(prefix).Handler(http.StripPrefix(prefix, h))
 }
-
+func dumpRequest(writer io.Writer, header string, r *http.Request) error {
+	data, err := httputil.DumpRequest(r, true)
+	if err != nil {
+		return err
+	}
+	writer.Write([]byte("\n" + header + ": \n"))
+	writer.Write(data)
+	return nil
+}
 func (s *server) parseRealIP(r *http.Request) (string, error) {
 	remoteAddr, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {
@@ -141,4 +156,74 @@ func (s *server) absPath(pathItems ...string) string {
 	paths[0] = s.issuerURL.Path
 	copy(paths[1:], pathItems)
 	return path.Join(paths...)
+}
+func (s *server) checkResponseType(rt ResponseType) bool {
+	for art := range s.supportedResponseTypes {
+		if art == rt.String() {
+			return true
+		}
+	}
+	return false
+}
+
+// CheckCodeChallengeMethod checks for allowed code challenge method
+func (s *server) checkCodeChallengeMethod(ccm CodeChallengeMethod) bool {
+	for c := range s.supportedCodeChallengeMethods {
+		if c == ccm.String() {
+			return true
+		}
+	}
+	return false
+}
+func (s *server) checkGrantType(gt GrantType) bool {
+	for agt := range s.supportedGrantTypes {
+		if agt == gt.String() {
+			return true
+		}
+	}
+	return false
+}
+func (s *server) getErrorData(err error) (map[string]any, int, http.Header) {
+	var re xerr.Response
+	if v, ok := xerr.Descriptions[err]; ok {
+		re.Error = err
+		re.Description = v
+		re.StatusCode = xerr.StatusCodes[err]
+	} else {
+		if fn := s.internalErrorHandler; fn != nil {
+			if v := fn(err); v != nil {
+				re = *v
+			}
+		}
+
+		if re.Error == nil {
+			re.Error = xerr.ErrServerError
+			re.Description = xerr.Descriptions[xerr.ErrServerError]
+			re.StatusCode = xerr.StatusCodes[xerr.ErrServerError]
+		}
+	}
+
+	data := make(map[string]interface{})
+	if err := re.Error; err != nil {
+		data["error"] = err.Error()
+	}
+
+	if v := re.ErrorCode; v != 0 {
+		data["error_code"] = v
+	}
+
+	if v := re.Description; v != "" {
+		data["error_description"] = v
+	}
+
+	if v := re.URI; v != "" {
+		data["error_uri"] = v
+	}
+
+	statusCode := http.StatusInternalServerError
+	if v := re.StatusCode; v > 0 {
+		statusCode = v
+	}
+
+	return data, statusCode, re.Header
 }

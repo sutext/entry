@@ -9,17 +9,18 @@ import (
 )
 
 type options struct {
-	addr                   string
-	dirver                 model.Driver
-	logger                 *xlog.Logger
-	issuerURL              string
-	allHeaders             http.Header
-	realIPHeader           string
-	allowedOrigins         []string
-	allowedHeaders         []string
-	trustedRealIPCIDRs     []*netip.Prefix
-	supportedGrantTypes    []string
-	supportedResponseTypes map[string]bool
+	addr                          string
+	dirver                        model.Driver
+	logger                        *xlog.Logger
+	issuerURL                     string
+	allHeaders                    http.Header
+	realIPHeader                  string
+	allowedOrigins                []string
+	allowedHeaders                []string
+	trustedRealIPCIDRs            []*netip.Prefix
+	supportedGrantTypes           map[string]struct{}
+	supportedResponseTypes        map[string]struct{}
+	supportedCodeChallengeMethods map[string]struct{}
 }
 
 func newOptions(opts ...Option) *options {
@@ -84,11 +85,25 @@ func WithTrustedRealIPCIDRs(cidrs []*netip.Prefix) Option {
 }
 func WithSupportedGrantTypes(grantTypes []string) Option {
 	return option(func(o *options) {
-		o.supportedGrantTypes = grantTypes
+		o.supportedGrantTypes = make(map[string]struct{}, len(grantTypes))
+		for _, gt := range grantTypes {
+			o.supportedGrantTypes[gt] = struct{}{}
+		}
 	})
 }
-func WithSupportedResponseTypes(responseTypes map[string]bool) Option {
+func WithSupportedResponseTypes(responseTypes []string) Option {
 	return option(func(o *options) {
-		o.supportedResponseTypes = responseTypes
+		o.supportedResponseTypes = make(map[string]struct{}, len(responseTypes))
+		for _, rt := range responseTypes {
+			o.supportedResponseTypes[rt] = struct{}{}
+		}
+	})
+}
+func WithSupportedCodeChallengeMethods(methods []CodeChallengeMethod) Option {
+	return option(func(o *options) {
+		o.supportedCodeChallengeMethods = make(map[string]struct{}, len(methods))
+		for _, m := range methods {
+			o.supportedCodeChallengeMethods[m.String()] = struct{}{}
+		}
 	})
 }

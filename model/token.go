@@ -3,6 +3,7 @@ package model
 import (
 	"database/sql/driver"
 	"encoding/json"
+	"net/url"
 	"time"
 
 	"sutext.github.io/entry/scope"
@@ -102,4 +103,23 @@ type AuthCode struct {
 	Claims      Claims
 	Expiry      time.Time
 	PKCE        PKCE
+}
+
+type TokenInfo struct {
+	ClientID            string        `bson:"ClientID"`
+	UserID              string        `bson:"UserID"`
+	RedirectURI         string        `bson:"RedirectURI"`
+	Scope               string        `bson:"Scope"`
+	Code                string        `bson:"Code"`
+	CodeChallenge       string        `bson:"CodeChallenge"`
+	CodeChallengeMethod string        `bson:"CodeChallengeMethod"`
+	CodeCreateAt        time.Time     `bson:"CodeCreateAt"`
+	CodeExpiresIn       time.Duration `bson:"CodeExpiresIn"`
+	Access              string        `bson:"Access"`
+	AccessCreateAt      time.Time     `bson:"AccessCreateAt"`
+	AccessExpiresIn     time.Duration `bson:"AccessExpiresIn"`
+	Refresh             string        `bson:"Refresh"`
+	RefreshCreateAt     time.Time     `bson:"RefreshCreateAt"`
+	RefreshExpiresIn    time.Duration `bson:"RefreshExpiresIn"`
+	Extension           url.Values    `bson:"Extension"`
 }

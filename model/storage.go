@@ -80,6 +80,8 @@ type Storage interface {
 	CreateRefresh(ctx context.Context, r RefreshToken) error
 	DeleteRefresh(ctx context.Context, id string) error
 	UpdateRefresh(ctx context.Context, id string, updater func(r RefreshToken) (RefreshToken, error)) error
+
+	CreateTokenInfo(ctx context.Context) (*TokenInfo, error)
 }
 type Driver interface {
 	Open() (db *gorm.DB, err error)
@@ -314,4 +316,8 @@ func (s *storage) UpdateRefresh(ctx context.Context, id string, updater func(r R
 		return err
 	}
 	return s.db.WithContext(ctx).Save(&newRefresh).Error
+}
+
+func (s *storage) CreateTokenInfo(ctx context.Context) (ti *TokenInfo, err error) {
+	return ti, nil
 }

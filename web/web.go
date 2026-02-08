@@ -29,30 +29,30 @@ type WebSite struct {
 }
 
 const (
-	tmplApproval      = "approval.html"
-	tmplLogin         = "login.html"
-	tmplPassword      = "password.html"
 	tmplOOB           = "oob.html"
 	tmplError         = "error.html"
+	tmplLogin         = "login.html"
 	tmplDevice        = "device.html"
+	tmplApproval      = "approval.html"
+	tmplPassword      = "password.html"
 	tmplDeviceSuccess = "device_success.html"
 )
 
 var requiredTmpls = []string{
-	tmplApproval,
-	tmplLogin,
-	tmplPassword,
 	tmplOOB,
 	tmplError,
+	tmplLogin,
 	tmplDevice,
+	tmplApproval,
+	tmplPassword,
 	tmplDeviceSuccess,
 }
 
 type Config struct {
 	FS        fs.FS
-	LogoURL   string
-	Issuer    string
 	Theme     string
+	Issuer    string
+	LogoURL   string
 	IssuerURL string
 	Extra     map[string]string
 }
@@ -62,19 +62,23 @@ func funcMap(c Config) (template.FuncMap, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error parsing issuerURL: %v", err)
 	}
-
-	funcs := map[string]any{
-		"extra":  func(k string) string { return c.Extra[k] },
-		"issuer": func() string { return c.Issuer },
-		"logo":   func() string { return c.LogoURL },
-		"lower":  strings.ToLower,
-		"trim":   strings.TrimSpace,
-		"upper":  strings.ToUpper,
+	funcs := template.FuncMap{
 		"url": func(reqPath, assetPath string) string {
 			return relativeURL(issuerURL.Path, reqPath, assetPath)
 		},
+		"logo": func() string {
+			return c.LogoURL
+		},
+		"trim":  strings.TrimSpace,
+		"lower": strings.ToLower,
+		"upper": strings.ToUpper,
+		"extra": func(k string) string {
+			return c.Extra[k]
+		},
+		"issuer": func() string {
+			return c.Issuer
+		},
 	}
-
 	return funcs, nil
 }
 
@@ -103,7 +107,6 @@ func NewWebSite(c Config) (*WebSite, error) {
 	if c.LogoURL == "" {
 		c.LogoURL = "theme/logo.png"
 	}
-
 	staticFiles, err := fs.Sub(c.FS, "static")
 	if err != nil {
 		return nil, fmt.Errorf("read static dir: %v", err)
@@ -116,13 +119,12 @@ func NewWebSite(c Config) (*WebSite, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read robots.txt dir: %v", err)
 	}
-
 	static := http.FileServer(http.FS(staticFiles))
 	theme := http.FileServer(http.FS(themeFiles))
-	robots := func(w http.ResponseWriter, r *http.Request) { fmt.Fprint(w, string(robotsContent)) }
-
+	robots := func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, string(robotsContent))
+	}
 	templates, err := loadTemplates(c, "templates")
-
 	return &WebSite{static, theme, robots, templates}, err
 }
 
@@ -132,7 +134,6 @@ func loadTemplates(c Config, templatesDir string) (map[string]*template.Template
 	if err != nil {
 		return nil, fmt.Errorf("read dir: %v", err)
 	}
-
 	filenames := []string{}
 	for _, file := range files {
 		if file.IsDir() {
@@ -143,12 +144,10 @@ func loadTemplates(c Config, templatesDir string) (map[string]*template.Template
 	if len(filenames) == 0 {
 		return nil, fmt.Errorf("no files in template dir %q", templatesDir)
 	}
-
 	funcs, err := funcMap(c)
 	if err != nil {
 		return nil, err
 	}
-
 	tmpls, err := template.New("").Funcs(funcs).ParseFS(c.FS, filenames...)
 	if err != nil {
 		return nil, fmt.Errorf("parse files: %v", err)
@@ -189,7 +188,6 @@ func relativeURL(serverPath, reqPath, assetPath string) string {
 		// assetPath points to the external URL, no changes needed
 		return assetPath
 	}
-
 	splitPath := func(p string) []string {
 		res := []string{}
 		parts := strings.Split(path.Clean(p), "/")
@@ -200,13 +198,11 @@ func relativeURL(serverPath, reqPath, assetPath string) string {
 		}
 		return res
 	}
-
 	stripCommonParts := func(s1, s2 []string) ([]string, []string) {
 		min := len(s1)
 		if len(s2) < min {
 			min = len(s2)
 		}
-
 		splitIndex := min
 		for i := 0; i < min; i++ {
 			if s1[i] != s2[i] {
@@ -216,15 +212,11 @@ func relativeURL(serverPath, reqPath, assetPath string) string {
 		}
 		return s1[splitIndex:], s2[splitIndex:]
 	}
-
 	server, req, asset := splitPath(serverPath), splitPath(reqPath), splitPath(assetPath)
-
 	// Remove common prefix of request path with server path
 	_, req = stripCommonParts(server, req)
-
 	// Remove common prefix of request path with asset path
 	asset, req = stripCommonParts(asset, req)
-
 	// For each part of the request remaining (minus one) -> go up one level (..)
 	// For each part of the asset remaining               -> append it
 	var relativeURL string
@@ -232,7 +224,6 @@ func relativeURL(serverPath, reqPath, assetPath string) string {
 		relativeURL = path.Join("..", relativeURL)
 	}
 	relativeURL = path.Join(relativeURL, path.Join(asset...))
-
 	return relativeURL
 }
 

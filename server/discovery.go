@@ -38,7 +38,7 @@ func (s *server) handleDiscovery(w http.ResponseWriter, r *http.Request) {
 func (s *server) constructDiscovery() discovery {
 	d := discovery{
 		Issuer:             s.issuerURL.String(),
-		AuthEndpoint:       s.absURL("/auth"),
+		AuthEndpoint:       s.absURL("/authorize"),
 		TokenEndpoint:      s.absURL("/token"),
 		JwksURI:            s.absURL("/keys"),
 		UserInfoEndpoint:   s.absURL("/userinfo"),
@@ -59,6 +59,9 @@ func (s *server) constructDiscovery() discovery {
 	}
 	sort.Strings(d.ResponseTypes)
 
-	d.GrantTypes = s.supportedGrantTypes
+	for grantType := range s.supportedGrantTypes {
+		d.GrantTypes = append(d.GrantTypes, grantType)
+	}
+	sort.Strings(d.GrantTypes)
 	return d
 }
