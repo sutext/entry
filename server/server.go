@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/fs"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -14,9 +15,11 @@ import (
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"sutext.github.io/entry/model"
+	"sutext.github.io/entry/view"
 	"sutext.github.io/entry/xerr"
 	"sutext.github.io/entry/xlog"
 )
+
 
 type Server interface {
 	Serve() error
@@ -41,6 +44,8 @@ type server struct {
 	supportedGrantTypes           map[string]struct{}
 	supportedResponseTypes        map[string]struct{}
 	supportedCodeChallengeMethods map[string]struct{}
+	refreshTokenResolveHandler    RefreshTokenResolveHandler
+	passwordAuthorizationHandler  PasswordAuthorizationHandler
 }
 
 func New(opts ...Option) Server {
@@ -72,12 +77,21 @@ func (s *server) Serve() error {
 	}
 	s.db = db
 	s.mux.NotFoundHandler = http.NotFoundHandler()
-	s.HandleCORS("/", s.handleRoot)
-	s.HandleCORS("/.well-known/openid-configuration", s.handleDiscovery)
+	// s.HandleCORS("/", s.handleRoot)
+	// s.HandleCORS("/.well-known/openid-configuration", s.handleDiscovery)
 	// s.HandleFunc("/token", s.handleToken)
-	s.HandleFunc("/authorize", s.handleAuthorize)
+	// s.HandleFunc("/authorize", s.handleAuthorize)
+	views := http.FileServer(http.FS(view.Files))
+	http.Handle("/dist/", http.StripPrefix("/dist/", views))
+	fs.WalkDir(view.Files, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		fmt.Println("Embedded:", path)
+		return nil
+	})
 	s.logger.Info("Server started")
-	http.ListenAndServe(":8080", s.mux)
+	http.ListenAndServe(":8080", nil)
 	return nil
 }
 func (s *server) Shoutdown(ctx context.Context) error {

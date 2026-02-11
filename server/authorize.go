@@ -24,26 +24,29 @@ func (s *server) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to start session: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	var form url.Values
-	if v, ok := store.Get("ReturnUri"); ok {
-		form = v.(url.Values)
+	if r.Form == nil {
+		r.ParseForm()
 	}
-	r.Form = form
-	store.Delete("ReturnUri")
+	uid, ok := store.Get("LoggedInUserID")
+	if !ok {
+		store.Set("ReturnUri", r.Form)
+		store.Save()
+		w.Header().Set("Location", "/login")
+		w.WriteHeader(http.StatusFound)
+		return
+	}
+	userID := uid.(string)
+	store.Delete("LoggedInUserID")
+	if v, ok := store.Get("ReturnUri"); ok {
+		form := v.(url.Values)
+		store.Delete("ReturnUri")
+		r.Form = form
+	}
 	store.Save()
 
 	req, err := s.validateAuthorizeRequest(r)
 	if err != nil {
 		s.redirectError(w, req, err)
-		return
-	}
-
-	// user authorization
-	userID, err := s.getLoggedInUserID(w, r)
-	if err != nil {
-		s.redirectError(w, req, err)
-		return
-	} else if userID == "" {
 		return
 	}
 	req.UserID = userID
@@ -127,30 +130,6 @@ func (s *server) validateAuthorizeRequest(r *http.Request) (*AuthorizeRequest, e
 		CodeChallengeMethod: ccm,
 	}
 	return req, nil
-}
-func (s *server) getLoggedInUserID(w http.ResponseWriter, r *http.Request) (userID string, err error) {
-	store, err := session.Start(r.Context(), w, r)
-	if err != nil {
-		return
-	}
-
-	uid, ok := store.Get("LoggedInUserID")
-	if !ok {
-		if r.Form == nil {
-			r.ParseForm()
-		}
-		store.Set("ReturnUri", r.Form)
-		store.Save()
-
-		w.Header().Set("Location", "/login")
-		w.WriteHeader(http.StatusFound)
-		return
-	}
-
-	userID = uid.(string)
-	store.Delete("LoggedInUserID")
-	store.Save()
-	return
 }
 func (s *server) getRedirectURI(req *AuthorizeRequest, data map[string]any) (string, error) {
 	u, err := url.Parse(req.RedirectURI)

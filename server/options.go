@@ -1,12 +1,16 @@
 package server
 
 import (
+	"context"
 	"net/http"
 	"net/netip"
 
 	"sutext.github.io/entry/model"
 	"sutext.github.io/entry/xlog"
 )
+
+type RefreshTokenResolveHandler func(r *http.Request) (string, error)
+type PasswordAuthorizationHandler func(ctx context.Context, clientID, username, password string) (userID string, err error)
 
 type options struct {
 	addr                          string
