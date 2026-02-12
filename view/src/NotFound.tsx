@@ -2,33 +2,22 @@ import {
   FileQuestion,
   Home
 } from 'lucide-react';
-import { cardBaseStyles, Footer } from './Widgets';
 import { useNavigate } from 'react-router-dom';
+
 const NotFound = () => {
   const navigate = useNavigate();
-
   return (
-    <div className={`${cardBaseStyles} animate-in fade-in zoom-in-95 duration-500 flex flex-col items-center text-center`}>
-      <div className="w-20 h-20 bg-slate-50 rounded-3xl flex items-center justify-center mb-6 relative">
-        <FileQuestion className="text-slate-400 w-10 h-10" />
-        <div className="absolute -top-1 -right-1 w-6 h-6 bg-red-400 rounded-full border-4 border-white flex items-center justify-center text-[10px] text-white font-bold">!</div>
+    <div className="w-full min-h-screen flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-700">
+      <div className="relative mb-12">
+        <h1 className="text-[12rem] md:text-[18rem] font-black text-slate-100 leading-none select-none">404</h1>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <FileQuestion className="text-blue-500 w-24 h-24 mb-6 animate-bounce duration-[3000ms]" />
+          <h2 className="text-3xl font-bold text-slate-800">页面不存在</h2>
+          <button onClick={() => navigate('/')} className="mt-8 px-10 py-4 bg-slate-900 text-white font-bold rounded-2xl shadow-xl flex items-center space-x-2 active:scale-95 transition-all">
+            <Home className="w-5 h-5" /> <span>回到首页</span>
+          </button>
+        </div>
       </div>
-      
-      <h1 className="text-4xl font-black text-slate-200 mb-2">404</h1>
-      <h2 className="text-xl font-bold text-slate-800 mb-3">页面未找到</h2>
-      <p className="text-slate-500 text-sm mb-8 max-w-[240px]">
-        抱歉，您访问的路径似乎消失在数字黑洞中了。
-      </p>
-
-      <button 
-        onClick={() => navigate('/login')}
-        className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3.5 rounded-xl shadow-md shadow-blue-100 transition-all flex items-center justify-center space-x-2 active:scale-[0.98]"
-      >
-        <Home className="w-4 h-4" />
-        <span>回到首页</span>
-      </button>
-
-      <Footer className="mt-10 sm:hidden opacity-60" />
     </div>
   );
 };

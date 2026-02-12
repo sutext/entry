@@ -8,7 +8,7 @@ export const Background = () => (
 
 export const Footer = ({ className }:{className:string}) => (
   <footer className={`${className} text-slate-400 text-xs text-center`}>
-    <p>© 2024 AzureAuth Security. 保留所有权利。</p>
+    <p>© 2026 EntryAuth Security. 保留所有权利。</p>
     <div className="mt-2 space-x-3">
       <a href="#" className="hover:text-blue-400 transition-colors">隐私政策</a>
       <span>•</span>

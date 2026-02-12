@@ -30,7 +30,6 @@ type options struct {
 func newOptions(opts ...Option) *options {
 	os := &options{
 		addr:   ":8080",
-		dirver: nil,
 		logger: xlog.NewText(xlog.LevelInfo),
 	}
 	for _, o := range opts {

@@ -12,27 +12,32 @@ import (
 	"net/url"
 	"path"
 
-	"github.com/gorilla/handlers"
-	"github.com/gorilla/mux"
 	"sutext.github.io/entry/model"
 	"sutext.github.io/entry/view"
 	"sutext.github.io/entry/xerr"
 	"sutext.github.io/entry/xlog"
 )
 
+type endpints struct {
+	JWKS       string
+	Auth       string
+	Token      string
+	Device     string
+	UserInfo   string
+	Discovery  string
+	Introspect string
+}
 
 type Server interface {
 	Serve() error
 	Shoutdown(ctx context.Context) error
-	HandleFunc(p string, h http.HandlerFunc)
-	HandleCORS(p string, h http.HandlerFunc)
-	HandlePrefix(p string, h http.Handler)
 }
 type server struct {
 	db                            model.Storage
-	mux                           *mux.Router
+	mux                           *http.ServeMux
 	logger                        *xlog.Logger
 	dirver                        model.Driver
+	endpoints                     endpints
 	issuerURL                     url.URL
 	forcePKCE                     bool
 	allHeaders                    http.Header
@@ -55,7 +60,7 @@ func New(opts ...Option) Server {
 		panic(err)
 	}
 	s := &server{
-		mux:                           mux.NewRouter(),
+		mux:                           http.NewServeMux(),
 		logger:                        options.logger,
 		dirver:                        options.dirver,
 		issuerURL:                     *issuerURL,
@@ -68,66 +73,62 @@ func New(opts ...Option) Server {
 		supportedResponseTypes:        options.supportedResponseTypes,
 		supportedCodeChallengeMethods: options.supportedCodeChallengeMethods,
 	}
+	s.endpoints = endpints{
+		JWKS:       "/oauth/keys",
+		Auth:       "/oauth/authorize",
+		Token:      "/oauth/token",
+		Device:     "/oauth/device/code",
+		UserInfo:   "/oauth/userinfo",
+		Discovery:  "/.well-known/openid-configuration",
+		Introspect: "/oauth/token/introspect",
+	}
 	return s
 }
 func (s *server) Serve() error {
-	db, err := model.Open(s.dirver)
-	if err != nil {
-		return err
-	}
-	s.db = db
-	s.mux.NotFoundHandler = http.NotFoundHandler()
-	// s.HandleCORS("/", s.handleRoot)
-	// s.HandleCORS("/.well-known/openid-configuration", s.handleDiscovery)
-	// s.HandleFunc("/token", s.handleToken)
-	// s.HandleFunc("/authorize", s.handleAuthorize)
-	views := http.FileServer(http.FS(view.Files))
-	http.Handle("/dist/", http.StripPrefix("/dist/", views))
-	fs.WalkDir(view.Files, ".", func(path string, d fs.DirEntry, err error) error {
+	// 检查是否有数据库驱动，如果没有则跳过数据库初始化
+	if s.dirver != nil {
+		db, err := model.Open(s.dirver)
 		if err != nil {
 			return err
 		}
-		fmt.Println("Embedded:", path)
-		return nil
-	})
-	s.logger.Info("Server started")
-	http.ListenAndServe(":8080", nil)
-	return nil
+		s.db = db
+	}
+	distFS, err := fs.Sub(view.Files, "dist")
+	if err != nil {
+		fmt.Printf("Error creating sub filesystem: %v\n", err)
+		return err
+	}
+	s.mux.Handle("/", http.FileServerFS(distFS))
+	s.mux.HandleFunc(s.endpoints.Discovery, s.handleDiscovery)
+	// s.HandleFunc("/token", s.handleToken)
+	s.mux.HandleFunc(s.endpoints.Auth, s.handleAuthorize)
+
+	return http.ListenAndServe(":8080", s.mux)
 }
 func (s *server) Shoutdown(ctx context.Context) error {
 	return nil
 }
-func (s *server) handleRoot(w http.ResponseWriter, r *http.Request) {
-	_, err := fmt.Fprintf(w,
-		`<!DOCTYPE html>
-		<title>Entry</title>
-		<h1>Entry IdP</h1>
-		<h3>A Federated OpenID Connect Provider</h3>
-		<p><a href=%q>Discovery</a></p>`, s.absURL("/.well-known/openid-configuration"))
-	if err != nil {
-		s.logger.Error("failed to write response", xlog.Ctx(r.Context()), xlog.Err(err))
-		// s.renderError(r, w, http.StatusInternalServerError, "Handling the / path error.")
-		return
-	}
-}
-func (s *server) HandleFunc(p string, h http.HandlerFunc) {
-	s.mux.Handle(path.Join(s.issuerURL.Path, p), h)
-}
-func (s *server) HandleCORS(p string, h http.HandlerFunc) {
-	var handler http.Handler = h
-	if len(s.allowedOrigins) > 0 {
-		cors := handlers.CORS(
-			handlers.AllowedOrigins(s.allowedOrigins),
-			handlers.AllowedHeaders(s.allowedHeaders),
-		)
-		handler = cors(handler)
-	}
-	s.mux.Handle(path.Join(s.issuerURL.Path, p), handler)
-}
-func (s *server) HandlePrefix(p string, h http.Handler) {
-	prefix := path.Join(s.issuerURL.Path, p)
-	s.mux.PathPrefix(prefix).Handler(http.StripPrefix(prefix, h))
-}
+
+//	func (s *server) HandleFunc(p string, h http.HandlerFunc) {
+//		s.mux.Handle(path.Join(s.issuerURL.Path, p), h)
+//	}
+//
+//	func (s *server) HandleCORS(p string, h http.HandlerFunc) {
+//		var handler http.Handler = h
+//		if len(s.allowedOrigins) > 0 {
+//			cors := handlers.CORS(
+//				handlers.AllowedOrigins(s.allowedOrigins),
+//				handlers.AllowedHeaders(s.allowedHeaders),
+//			)
+//			handler = cors(handler)
+//		}
+//		s.mux.Handle(path.Join(s.issuerURL.Path, p), handler)
+//	}
+//
+//	func (s *server) HandlePrefix(p string, h http.Handler) {
+//		prefix := path.Join(s.issuerURL.Path, p)
+//		s.mux.PathPrefix(prefix).Handler(http.StripPrefix(prefix, h))
+//	}
 func dumpRequest(writer io.Writer, header string, r *http.Request) error {
 	data, err := httputil.DumpRequest(r, true)
 	if err != nil {

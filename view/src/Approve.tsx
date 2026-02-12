@@ -8,7 +8,8 @@ import {
   Smartphone 
 } from 'lucide-react';
 import { cardBaseStyles, Footer } from './Widgets';
-const Authorize = () => {
+
+const Approve = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
 
@@ -97,4 +98,4 @@ const Authorize = () => {
   );
 };
 
-export default Authorize
+export default Approve

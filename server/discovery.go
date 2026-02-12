@@ -38,12 +38,12 @@ func (s *server) handleDiscovery(w http.ResponseWriter, r *http.Request) {
 func (s *server) constructDiscovery() discovery {
 	d := discovery{
 		Issuer:             s.issuerURL.String(),
-		AuthEndpoint:       s.absURL("/authorize"),
-		TokenEndpoint:      s.absURL("/token"),
-		JwksURI:            s.absURL("/keys"),
-		UserInfoEndpoint:   s.absURL("/userinfo"),
-		DeviceEndpoint:     s.absURL("/device/code"),
-		IntrospectEndpoint: s.absURL("/token/introspect"),
+		AuthEndpoint:       s.endpoints.Auth,
+		TokenEndpoint:      s.endpoints.Token,
+		JwksURI:            s.endpoints.JWKS,
+		UserInfoEndpoint:   s.endpoints.UserInfo,
+		DeviceEndpoint:     s.endpoints.Device,
+		IntrospectEndpoint: s.endpoints.Introspect,
 		Subjects:           []string{"public"},
 		IDTokenAlgs:        []string{"RS256"},
 		CodeChallengeAlgs:  []string{"plain", "S256"},

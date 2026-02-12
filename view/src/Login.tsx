@@ -8,7 +8,7 @@ import {
   User, 
 } from 'lucide-react';
 import { cardBaseStyles, Footer } from './Widgets';
-const Login = () => {
+const Login = ({ onLogin }: { onLogin: () => void }) => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState('');
@@ -18,7 +18,8 @@ const Login = () => {
     setIsLoading(true);
     setTimeout(() => {
       setIsLoading(false);
-      navigate('/authorize');
+      onLogin();
+      navigate('/profile');
     }, 1200);
   };
 
@@ -87,7 +88,7 @@ const Login = () => {
 
       <div className="mt-8 pt-8 border-t border-slate-100 flex flex-col items-center">
         <p className="text-sm text-slate-500">还没有账号？</p>
-        <button className="mt-2 text-blue-500 font-semibold hover:underline decoration-2 underline-offset-4">创建一个新账号</button>
+        <button onClick={() => navigate('/register')} className="mt-2 text-blue-500 font-semibold hover:underline decoration-2 underline-offset-4">创建一个新账号</button>
       </div>
       <Footer className="mt-8 sm:hidden opacity-60" />
     </div>
