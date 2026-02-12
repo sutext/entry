@@ -22,7 +22,10 @@ type endpints struct {
 	JWKS       string
 	Auth       string
 	Token      string
+	Login      string
 	Device     string
+	Approve    string
+	Register   string
 	UserInfo   string
 	Discovery  string
 	Introspect string
@@ -76,8 +79,11 @@ func New(opts ...Option) Server {
 	s.endpoints = endpints{
 		JWKS:       "/oauth/keys",
 		Auth:       "/oauth/authorize",
+		Login:      "/login",
 		Token:      "/oauth/token",
 		Device:     "/oauth/device/code",
+		Approve:    "/approve",
+		Register:   "/register",
 		UserInfo:   "/oauth/userinfo",
 		Discovery:  "/.well-known/openid-configuration",
 		Introspect: "/oauth/token/introspect",
@@ -100,9 +106,11 @@ func (s *server) Serve() error {
 	}
 	s.mux.Handle("/", http.FileServerFS(distFS))
 	s.mux.HandleFunc(s.endpoints.Discovery, s.handleDiscovery)
-	// s.HandleFunc("/token", s.handleToken)
+	s.mux.HandleFunc(s.endpoints.Login, s.handleLogin)
+	s.mux.HandleFunc(s.endpoints.Token, s.handleToken)
+	s.mux.HandleFunc(s.endpoints.Register, s.handleRegister)
 	s.mux.HandleFunc(s.endpoints.Auth, s.handleAuthorize)
-
+	s.mux.HandleFunc(s.endpoints.Approve, s.handleApprove)
 	return http.ListenAndServe(":8080", s.mux)
 }
 func (s *server) Shoutdown(ctx context.Context) error {

@@ -31,7 +31,7 @@ func (s *server) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		store.Set("ReturnUri", r.Form)
 		store.Save()
-		w.Header().Set("Location", "/login")
+		w.Header().Set("Location", "/#/login")
 		w.WriteHeader(http.StatusFound)
 		return
 	}

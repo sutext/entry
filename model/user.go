@@ -16,7 +16,6 @@ type User struct {
 	Height    uint       `json:"height"` //cm
 	Avatar    *string    `json:"avatar"`
 	Gender    Gender     `json:"gender" gorm:"type:tinyint(1)"`
-	Groups    Strings    `json:"groups"`
 	Username  *string    `json:"username" gorm:"unique_index"`
 	Nickname  *string    `json:"nickname"`
 	Birthday  *time.Time `json:"birthday"`

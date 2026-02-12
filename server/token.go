@@ -1,5 +1,7 @@
 package server
 
+import "net/http"
+
 // import (
 // 	"context"
 // 	"encoding/json"
@@ -7,9 +9,13 @@ package server
 // 	"net/url"
 // 	"time"
 
-// 	"sutext.github.io/entry/model"
-// 	"sutext.github.io/entry/xerr"
+//	"sutext.github.io/entry/model"
+//	"sutext.github.io/entry/xerr"
+//
 // )
+func (s *server) handleToken(w http.ResponseWriter, r *http.Request) {
+
+}
 
 // func (s *server) handleTokenRequest(w http.ResponseWriter, r *http.Request) error {
 // 	ctx := r.Context()
