@@ -68,5 +68,5 @@ gorm.io/gorm v1.31.1 h1:7CA8FTFz/gRfgqgpeKIBcervUn3xSyPUmr6B2WXJ7kg=
 gorm.io/gorm v1.31.1/go.mod h1:XyQVbO2k6YkOis7C2437jSit3SsDK72s7n7rsSHd+Gs=
 sutext.github.io/jose v0.0.0-20260201050710-a0adf6921e23 h1:pj7+TMBZkSOXNPzblpBvtjy3kquPSeDfAxxavYnwrTM=
 sutext.github.io/jose v0.0.0-20260201050710-a0adf6921e23/go.mod h1:/6aSZaS7hWXMFJV6pxNVfTwRHFVun7zotB4Fy6ljxZ4=
-sutext.github.io/suid v1.6.0 h1:LqMZeIlfOPja2CAXH2Ig/UurIeHnZTf/xjGuyyXiFfw=
-sutext.github.io/suid v1.6.0/go.mod h1:Le8GEz8oa29Fu0jVEjqPPsFPH6B+7Qn++ZA/CD2YIU8=
+sutext.github.io/suid v1.7.0 h1:Myi4DSJ+Htwz724dE5sF5zVmOr1Zh+3PbfEAYtHaDH4=
+sutext.github.io/suid v1.7.0/go.mod h1:Le8GEz8oa29Fu0jVEjqPPsFPH6B+7Qn++ZA/CD2YIU8=

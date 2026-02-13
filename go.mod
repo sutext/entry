@@ -11,7 +11,7 @@ require (
 	gorm.io/driver/sqlite v1.6.0
 	gorm.io/gorm v1.31.1
 	sutext.github.io/jose v0.0.0-20260201050710-a0adf6921e23
-	sutext.github.io/suid v1.6.0
+	sutext.github.io/suid v1.7.0
 )
 
 require (
