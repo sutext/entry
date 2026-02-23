@@ -2,11 +2,6 @@ package model
 
 import (
 	"context"
-	"crypto"
-	"crypto/rand"
-	"encoding/base32"
-	"io"
-	"strings"
 
 	"gorm.io/gorm"
 	"sutext.github.io/suid"
@@ -15,34 +10,34 @@ import (
 // Kubernetes only allows lower case letters for names.
 //
 // TODO(ericchiang): refactor ID creation onto the storage.
-var encoding = base32.NewEncoding("abcdefghijklmnopqrstuvwxyz234567")
+// var encoding = base32.NewEncoding("abcdefghijklmnopqrstuvwxyz234567")
 
 // Valid characters for user codes
 // const validUserCharacters = "BCDFGHJKLMNPQRSTVWXZ"
 
 // NewDeviceCode returns a 32 char alphanumeric cryptographically secure string
-func NewDeviceCode() string {
-	return newSecureID(32)
-}
+// func NewDeviceCode() string {
+// 	return newSecureID(32)
+// }
 
-// NewID returns a random string which can be used as an ID for objects.
-func NewID() string {
-	return newSecureID(16)
-}
+// // NewID returns a random string which can be used as an ID for objects.
+// func NewID() string {
+// 	return newSecureID(16)
+// }
 
-func newSecureID(len int) string {
-	buff := make([]byte, len) // random ID.
-	if _, err := io.ReadFull(rand.Reader, buff); err != nil {
-		panic(err)
-	}
-	// Avoid the identifier to begin with number and trim padding
-	return string(buff[0]%26+'a') + strings.TrimRight(encoding.EncodeToString(buff[1:]), "=")
-}
+// func newSecureID(len int) string {
+// 	buff := make([]byte, len) // random ID.
+// 	if _, err := io.ReadFull(rand.Reader, buff); err != nil {
+// 		panic(err)
+// 	}
+// 	// Avoid the identifier to begin with number and trim padding
+// 	return string(buff[0]%26+'a') + strings.TrimRight(encoding.EncodeToString(buff[1:]), "=")
+// }
 
-// NewHMACKey returns a random key which can be used in the computation of an HMAC
-func NewHMACKey(h crypto.Hash) []byte {
-	return []byte(newSecureID(h.Size()))
-}
+// // NewHMACKey returns a random key which can be used in the computation of an HMAC
+// func NewHMACKey(h crypto.Hash) []byte {
+// 	return []byte(newSecureID(h.Size()))
+// }
 
 type Storage interface {
 	GetKeys(ctx context.Context) (Keys, error)

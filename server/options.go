@@ -14,6 +14,7 @@ type PasswordAuthorizationHandler func(ctx context.Context, clientID, username, 
 
 type options struct {
 	addr                          string
+	secret                        string
 	dirver                        model.Driver
 	logger                        *xlog.Logger
 	issuerURL                     string
@@ -30,6 +31,7 @@ type options struct {
 func newOptions(opts ...Option) *options {
 	os := &options{
 		addr:   ":8080",
+		secret: "R7xWhPNWejiOzxHPuiD2SRsvOwF81xWXcbxUJtXlG7A=",
 		logger: xlog.NewText(xlog.LevelInfo),
 	}
 	for _, o := range opts {

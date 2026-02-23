@@ -3,7 +3,6 @@ package model
 import (
 	"time"
 
-	"golang.org/x/crypto/bcrypt"
 	"sutext.github.io/suid"
 )
 
@@ -24,25 +23,19 @@ type User struct {
 	DeletedAt *time.Time `json:"deleted_at"`
 }
 type UserView struct {
-	ID       suid.SUID `json:"id"`
-	Age      *int8     `json:"age,omitempty"`
-	Email    *string   `json:"email,omitempty"`
-	Phone    *string   `json:"phone,omitempty"`
-	Weight   *uint     `json:"weight,omitempty"`
-	Height   *uint     `json:"height,omitempty"`
-	Avatar   *string   `json:"avatar,omitempty"`
-	Gender   *Gender   `json:"gender,omitempty"`
-	Username *string   `json:"username,omitempty"`
-	Nickname *string   `json:"nickname,omitempty"`
-	Birthday *int64    `json:"birthday,omitempty"`
+	ID       uint64  `json:"id"`
+	Age      *int8   `json:"age,omitempty"`
+	Email    *string `json:"email,omitempty"`
+	Phone    *string `json:"phone,omitempty"`
+	Weight   *uint   `json:"weight,omitempty"`
+	Height   *uint   `json:"height,omitempty"`
+	Avatar   *string `json:"avatar,omitempty"`
+	Gender   *Gender `json:"gender,omitempty"`
+	Username *string `json:"username,omitempty"`
+	Nickname *string `json:"nickname,omitempty"`
+	Birthday *int64  `json:"birthday,omitempty"`
 }
 
-func (u *User) VerifyPassword(password string) bool {
-	if err := bcrypt.CompareHashAndPassword([]byte(u.Hash), []byte(password)); err != nil {
-		return false
-	}
-	return true
-}
 func (u *User) ToView() *UserView {
 	var age *int8 = nil
 	if u.Birthday != nil {
@@ -55,7 +48,7 @@ func (u *User) ToView() *UserView {
 		birthday = &v
 	}
 	return &UserView{
-		ID:       u.ID,
+		ID:       uint64(u.ID),
 		Age:      age,
 		Email:    u.Email,
 		Phone:    u.Phone,
@@ -71,7 +64,6 @@ func (u *User) ToView() *UserView {
 func NewUser() *User {
 	return &User{
 		ID:        suid.New(),
-		Gender:    GenderUnknown,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
 	}

@@ -19,24 +19,23 @@ func (s *server) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx := r.Context()
+
 	store, err := session.Start(ctx, w, r)
 	if err != nil {
 		http.Error(w, "failed to start session: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	if r.Form == nil {
-		r.ParseForm()
-	}
-	uid, ok := store.Get("LoggedInUserID")
-	if !ok {
+	userID, err := s.ensureLoggedIn(r)
+	if err != nil {
 		store.Set("ReturnUri", r.Form)
 		store.Save()
 		w.Header().Set("Location", "/#/login")
 		w.WriteHeader(http.StatusFound)
 		return
 	}
-	userID := uid.(string)
-	store.Delete("LoggedInUserID")
+	if r.Form == nil {
+		r.ParseForm()
+	}
 	if v, ok := store.Get("ReturnUri"); ok {
 		form := v.(url.Values)
 		store.Delete("ReturnUri")

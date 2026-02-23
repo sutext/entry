@@ -3,15 +3,15 @@ module sutext.github.io/entry
 go 1.25.2
 
 require (
+	github.com/go-jose/go-jose/v4 v4.1.3
 	github.com/go-session/session/v3 v3.2.1
 	go.uber.org/zap v1.27.1
-	golang.org/x/crypto v0.47.0
+	golang.org/x/crypto v0.48.0
 	gorm.io/driver/mysql v1.6.0
 	gorm.io/driver/postgres v1.6.0
 	gorm.io/driver/sqlite v1.6.0
 	gorm.io/gorm v1.31.1
-	sutext.github.io/jose v0.0.0-20260201050710-a0adf6921e23
-	sutext.github.io/suid v1.7.0
+	sutext.github.io/suid v1.7.1
 )
 
 require (
@@ -27,5 +27,5 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.22 // indirect
 	go.uber.org/multierr v1.10.0 // indirect
 	golang.org/x/sync v0.19.0 // indirect
-	golang.org/x/text v0.33.0 // indirect
+	golang.org/x/text v0.34.0 // indirect
 )

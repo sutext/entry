@@ -2,9 +2,10 @@ package server
 
 import (
 	"context"
+	"crypto/ed25519"
+	"encoding/base64"
 	"fmt"
 	"io"
-	"io/fs"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -23,6 +24,7 @@ type endpints struct {
 	Auth       string
 	Token      string
 	Login      string
+	Logout     string
 	Device     string
 	Approve    string
 	Register   string
@@ -38,6 +40,7 @@ type Server interface {
 type server struct {
 	db                            model.Storage
 	mux                           *http.ServeMux
+	secret                        ed25519.PrivateKey
 	logger                        *xlog.Logger
 	dirver                        model.Driver
 	endpoints                     endpints
@@ -62,10 +65,15 @@ func New(opts ...Option) Server {
 	if err != nil {
 		panic(err)
 	}
+	seed, err := base64.StdEncoding.DecodeString(options.secret)
+	if err != nil {
+		panic(err)
+	}
 	s := &server{
 		mux:                           http.NewServeMux(),
 		logger:                        options.logger,
 		dirver:                        options.dirver,
+		secret:                        ed25519.NewKeyFromSeed(seed),
 		issuerURL:                     *issuerURL,
 		allHeaders:                    options.allHeaders,
 		realIPHeader:                  options.realIPHeader,
@@ -80,6 +88,7 @@ func New(opts ...Option) Server {
 		JWKS:       "/oauth/keys",
 		Auth:       "/oauth/authorize",
 		Login:      "/login",
+		Logout:     "/logout",
 		Token:      "/oauth/token",
 		Device:     "/oauth/device/code",
 		Approve:    "/approve",
@@ -91,20 +100,20 @@ func New(opts ...Option) Server {
 	return s
 }
 func (s *server) Serve() error {
-	// 检查是否有数据库驱动，如果没有则跳过数据库初始化
-	if s.dirver != nil {
-		db, err := model.Open(s.dirver)
-		if err != nil {
-			return err
-		}
-		s.db = db
+	if s.dirver == nil {
+		return fmt.Errorf("dirver is nil")
 	}
-	distFS, err := fs.Sub(view.Files, "dist")
+	db, err := model.Open(s.dirver)
 	if err != nil {
-		fmt.Printf("Error creating sub filesystem: %v\n", err)
 		return err
 	}
-	s.mux.Handle("/", http.FileServerFS(distFS))
+	s.db = db
+	fss, err := view.FileServer()
+	if err != nil {
+		return err
+	}
+	s.mux.Handle("/", fss)
+	s.mux.HandleFunc(s.endpoints.Logout, s.handleLogout)
 	s.mux.HandleFunc(s.endpoints.Discovery, s.handleDiscovery)
 	s.mux.HandleFunc(s.endpoints.Login, s.handleLogin)
 	s.mux.HandleFunc(s.endpoints.Token, s.handleToken)
