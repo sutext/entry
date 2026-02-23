@@ -8,17 +8,20 @@ import {
   Smartphone 
 } from 'lucide-react';
 import { cardBaseStyles, Footer } from './Widgets';
+import { approve } from './Service';
 
 const Approve = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
 
   const handleApprove = () => {
-    setIsLoading(true);
-    setTimeout(() => {
-      alert('授权成功！正在重定向回第三方应用...');
+     approve().then(() => {
       setIsLoading(false);
-    }, 1000);
+      navigate('/profile');
+    }).catch(() => {
+      setIsLoading(false);
+      alert('授权失败，请重试。');
+    });
   };
 
   return (

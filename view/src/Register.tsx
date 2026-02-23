@@ -2,20 +2,24 @@ import { ArrowLeft, Mail, User,Lock, UserPlus } from "lucide-react";
 import { cardBaseStyles, Footer } from "./Widgets";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
+import { register } from "./Service";
 
 const Register = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
-
+  const [email, setEmail] = useState('');
+    const [password, setPassword] = useState('');
   const handleRegister = (e:React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
-    setTimeout(() => {
+    register({ email, password }).then(() => {
       setIsLoading(false);
-      // 注册成功后跳转登录
       alert('账号创建成功！请登录。');
       navigate('/login');
-    }, 1500);
+    }).catch(() => {
+      setIsLoading(false);
+      alert('账号创建失败，请重试。');
+    });
   };
 
   return (
@@ -56,6 +60,8 @@ const Register = () => {
             <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
             <input 
               required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               type="email" 
               placeholder="name@example.com"
               className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 focus:bg-white transition-all"
@@ -69,6 +75,8 @@ const Register = () => {
             <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
             <input 
               required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               type="password" 
               placeholder="至少 8 位字符"
               className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 focus:bg-white transition-all"

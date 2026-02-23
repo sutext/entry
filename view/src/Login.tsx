@@ -8,19 +8,24 @@ import {
   User, 
 } from 'lucide-react';
 import { cardBaseStyles, Footer } from './Widgets';
+import { login } from './Service';
 const Login = ({ onLogin }: { onLogin: () => void }) => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
 
   const handleLogin = (e:React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
-    setTimeout(() => {
+    login({ email, password }).then(() => {
       setIsLoading(false);
       onLogin();
       navigate('/profile');
-    }, 1200);
+    }).catch(() => {
+      setIsLoading(false);
+      alert('登录失败，请重试。');
+    });
   };
 
   return (
@@ -57,6 +62,8 @@ const Login = ({ onLogin }: { onLogin: () => void }) => {
               required
               type="password" 
               placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               className="w-full pl-12 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-400 focus:bg-white transition-all"
             />
           </div>
