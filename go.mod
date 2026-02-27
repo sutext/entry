@@ -4,19 +4,17 @@ go 1.25.2
 
 require (
 	github.com/go-jose/go-jose/v4 v4.1.3
-	github.com/go-session/session/v3 v3.2.1
 	go.uber.org/zap v1.27.1
 	golang.org/x/crypto v0.48.0
 	gorm.io/driver/mysql v1.6.0
 	gorm.io/driver/postgres v1.6.0
 	gorm.io/driver/sqlite v1.6.0
 	gorm.io/gorm v1.31.1
-	sutext.github.io/suid v1.7.1
+	sutext.github.io/suid v1.8.0
 )
 
 require (
 	filippo.io/edwards25519 v1.1.0 // indirect
-	github.com/bytedance/gopkg v0.0.0-20221122125632-68358b8ecec6 // indirect
 	github.com/go-sql-driver/mysql v1.8.1 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect

@@ -115,14 +115,7 @@ func (s *server) handleLogout(w http.ResponseWriter, r *http.Request) {
 	}
 }
 func (s *server) generateToken(user *model.User) (string, error) {
-	signer, err := jose.NewSigner(jose.SigningKey{
-		Algorithm: jose.EdDSA,
-		Key:       s.secret,
-	}, nil)
-	if err != nil {
-		return "", err
-	}
-	builder := jwt.Signed(signer)
+	builder := jwt.Signed(s.signer)
 	builder.Claims(jwt.Claims{
 		Subject:  user.ID.String(),
 		Expiry:   jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
@@ -130,12 +123,22 @@ func (s *server) generateToken(user *model.User) (string, error) {
 	})
 	return builder.Serialize()
 }
-func (s *server) ensureLoggedIn(r *http.Request) (string, error) {
+func (s *server) getToken(r *http.Request) (string, error) {
+	if cookie, err := r.Cookie("token"); err == nil {
+		return cookie.Value, nil
+	}
 	token := r.Header.Get("Authorization")
 	if token == "" {
 		return "", fmt.Errorf("missing authorization token")
 	}
 	token = token[len("Bearer "):]
+	return token, nil
+}
+func (s *server) ensureLoggedIn(r *http.Request) (string, error) {
+	token, err := s.getToken(r)
+	if err != nil {
+		return "", err
+	}
 	tok, err := jwt.ParseSigned(token, []jose.SignatureAlgorithm{jose.EdDSA})
 	if err != nil {
 		return "", err

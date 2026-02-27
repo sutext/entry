@@ -50,15 +50,15 @@ type Storage interface {
 	CreateUser(ctx context.Context, user *User) error
 	UpdateUser(ctx context.Context, user *User) error
 
-	GetToken(ctx context.Context, id suid.SUID) (*UserToken, error)
-	CreateToken(ctx context.Context, token *UserToken) error
-	DeleteToken(ctx context.Context, token *UserToken) error
+	GetToken(ctx context.Context, id suid.SUID) (*AccessToken, error)
+	CreateToken(ctx context.Context, token *AccessToken) error
+	DeleteToken(ctx context.Context, token *AccessToken) error
 
-	GetClient(ctx context.Context, id string) (Client, error)
-	CreateClient(ctx context.Context, client Client) error
+	GetClient(ctx context.Context, id string) (*Client, error)
+	CreateClient(ctx context.Context, client *Client) error
 	DeleteClient(ctx context.Context, id string) error
-	UpdateClient(ctx context.Context, id string, updater func(c Client) (Client, error)) error
-	ListClients(ctx context.Context) ([]Client, error)
+	UpdateClient(ctx context.Context, id string, updater func(c *Client) (*Client, error)) error
+	ListClients(ctx context.Context) ([]*Client, error)
 
 	GetAuthRequest(ctx context.Context, id string) (AuthRequest, error)
 	CreateAuthRequest(ctx context.Context, a AuthRequest) error
@@ -161,8 +161,8 @@ func (s *storage) UpdateUser(ctx context.Context, user *User) error {
 	return s.db.WithContext(ctx).Save(user).Error
 }
 
-func (s *storage) GetToken(ctx context.Context, id suid.SUID) (*UserToken, error) {
-	var token UserToken
+func (s *storage) GetToken(ctx context.Context, id suid.SUID) (*AccessToken, error) {
+	var token AccessToken
 	err := s.db.WithContext(ctx).First(&token, id).Error
 	if err != nil {
 		return nil, err
@@ -170,42 +170,42 @@ func (s *storage) GetToken(ctx context.Context, id suid.SUID) (*UserToken, error
 	return &token, nil
 }
 
-func (s *storage) CreateToken(ctx context.Context, token *UserToken) error {
+func (s *storage) CreateToken(ctx context.Context, token *AccessToken) error {
 	return s.db.WithContext(ctx).Create(token).Error
 }
 
-func (s *storage) DeleteToken(ctx context.Context, token *UserToken) error {
+func (s *storage) DeleteToken(ctx context.Context, token *AccessToken) error {
 	return s.db.WithContext(ctx).Delete(token).Error
 }
 
 // Below is Client implementations
-func (s *storage) GetClient(ctx context.Context, id string) (Client, error) {
+func (s *storage) GetClient(ctx context.Context, id string) (*Client, error) {
 	var client Client
 	err := s.db.WithContext(ctx).First(&client, id).Error
-	return client, err
+	return &client, err
 }
 
-func (s *storage) CreateClient(ctx context.Context, client Client) error {
+func (s *storage) CreateClient(ctx context.Context, client *Client) error {
 	return s.db.WithContext(ctx).Create(client).Error
 }
 
-func (s *storage) UpdateClient(ctx context.Context, id string, updater func(c Client) (Client, error)) error {
+func (s *storage) UpdateClient(ctx context.Context, id string, updater func(c *Client) (*Client, error)) error {
 	var client Client
 	err := s.db.WithContext(ctx).First(&client, id).Error
 	if err != nil {
 		return err
 	}
-	newClient, err := updater(client)
+	newClient, err := updater(&client)
 	if err != nil {
 		return err
 	}
-	return s.db.WithContext(ctx).Save(&newClient).Error
+	return s.db.WithContext(ctx).Save(newClient).Error
 }
 func (s *storage) DeleteClient(ctx context.Context, id string) error {
 	return s.db.WithContext(ctx).Delete(Client{}, id).Error
 }
-func (s *storage) ListClients(ctx context.Context) ([]Client, error) {
-	var clients []Client
+func (s *storage) ListClients(ctx context.Context) ([]*Client, error) {
+	var clients []*Client
 	err := s.db.WithContext(ctx).Find(&clients).Error
 	if err != nil {
 		return nil, err

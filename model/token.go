@@ -11,11 +11,26 @@ import (
 	"sutext.github.io/suid"
 )
 
-type UserToken struct {
-	UserID       suid.SUID `json:"user_id"`
-	ExpiryIn     time.Time `json:"expiry_in"`
-	AccessToken  *string   `json:"access_token"`
-	RefreshToken *string   `json:"refresh_token"`
+type AccessToken struct {
+	ID          string    `gorm:"primary_key"`
+	UserID      suid.SUID `json:"user_id"`
+	ClientID    string    `json:"client_id"`
+	ExpiryIn    time.Time `json:"expiry_in"`
+	AccessToken *string   `json:"access_token"`
+}
+
+// RefreshToken is an OAuth2 refresh token which allows a client to request new
+// tokens on the end user's behalf.
+type RefreshToken struct {
+	ID           string `gorm:"primary_key"`
+	UserID       suid.SUID
+	ClientID     string
+	RefreshToken string
+	CreatedAt    time.Time
+	LastUsed     time.Time
+	Claims       Claims
+	Scopes       scope.Scopes
+	Nonce        string
 }
 
 // VerificationKey is a rotated signing key which can still be used to verify
@@ -72,21 +87,6 @@ type AuthRequest struct {
 	RedirectURI         string
 	ResponseTypes       Strings
 	ForceApprovalPrompt bool
-}
-
-// RefreshToken is an OAuth2 refresh token which allows a client to request new
-// tokens on the end user's behalf.
-type RefreshToken struct {
-	ID            string `gorm:"primary_key"`
-	ClientID      string
-	UserID        suid.SUID
-	Token         string
-	ObsoleteToken string
-	CreatedAt     time.Time
-	LastUsed      time.Time
-	Claims        Claims
-	Scopes        scope.Scopes
-	Nonce         string
 }
 
 // AuthCode represents a code which can be exchanged for an OAuth2 token response.

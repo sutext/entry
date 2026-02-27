@@ -5,86 +5,101 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"time"
 
-	"github.com/go-session/session/v3"
 	"sutext.github.io/entry/model"
 	"sutext.github.io/entry/xerr"
+	"sutext.github.io/suid/guid"
 )
 
-func (s *server) handleAuthorize(w http.ResponseWriter, r *http.Request) {
+func (s *server) handleApprove(w http.ResponseWriter, r *http.Request) {
 	err := dumpRequest(w, "Request", r)
 	if err != nil {
 		http.Error(w, "failed to dump request: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	ctx := r.Context()
-
-	store, err := session.Start(ctx, w, r)
+	reqid := r.URL.Query().Get("reqid")
+	if reqid == "" {
+		http.Error(w, "reqid is empty", http.StatusBadRequest)
+		return
+	}
+	req, err := s.reqCache.Get(reqid)
 	if err != nil {
-		http.Error(w, "failed to start session: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "reqid not found: "+err.Error(), http.StatusBadRequest)
 		return
 	}
 	userID, err := s.ensureLoggedIn(r)
 	if err != nil {
-		store.Set("ReturnUri", r.Form)
-		store.Save()
-		w.Header().Set("Location", "/#/login")
+		w.Header().Set("Location", "/#/login?reqid="+reqid)
 		w.WriteHeader(http.StatusFound)
 		return
 	}
-	if r.Form == nil {
-		r.ParseForm()
+	code := guid.New().String()
+	s.codeCache.Set(code, userID, time.Minute*10)
+	u, err := url.Parse(req.RedirectURI)
+	if err != nil {
+		s.redirectError(w, req, err)
+		return
 	}
-	if v, ok := store.Get("ReturnUri"); ok {
-		form := v.(url.Values)
-		store.Delete("ReturnUri")
-		r.Form = form
+	q := u.Query()
+	if req.State != "" {
+		q.Set("state", req.State)
 	}
-	store.Save()
-
+	q.Set("code", code)
+	u.RawQuery = q.Encode()
+	http.Redirect(w, r, u.String(), http.StatusFound)
+}
+func (s *server) handleAuthorize(w http.ResponseWriter, r *http.Request) {
+	err := dumpRequest(os.Stdout, "Request", r)
+	if err != nil {
+		http.Error(w, "failed to dump request: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	ctx := r.Context()
 	req, err := s.validateAuthorizeRequest(r)
 	if err != nil {
-		s.redirectError(w, req, err)
+		http.Error(w, "failed to validate authorize request: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	req.UserID = userID
-
-	// // specify the scope of authorization
-	// if fn := s.AuthorizeScopeHandler; fn != nil {
-	// 	scope, err := fn(w, r)
-	// 	if err != nil {
-	// 		return err
-	// 	} else if scope != "" {
-	// 		req.Scope = scope
-	// 	}
-	// }
-
-	// // specify the expiration time of access token
-	// if fn := s.AccessTokenExpHandler; fn != nil {
-	// 	exp, err := fn(w, r)
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	req.AccessTokenExp = exp
-	// }
-
-	ti, err := s.getAuthorizeToken(ctx, req)
+	if req.ResponseType != ResponseTypeCode {
+		http.Error(w, "only support response type code", http.StatusBadRequest)
+		return
+	}
+	client, err := s.db.GetClient(ctx, req.ClientID)
 	if err != nil {
 		s.redirectError(w, req, err)
 		return
 	}
-
-	// If the redirect URI is empty, the default domain provided by the client is used.
-	if req.RedirectURI == "" {
-		client, err := s.db.GetClient(ctx, req.ClientID)
-		if err != nil {
-			s.redirectError(w, req, err)
-			return
-		}
-		req.RedirectURI = client.RedirectURIs[0]
+	if err := s.validateClientSettings(client, req, r); err != nil {
+		s.redirectError(w, req, err)
+		return
 	}
-	s.redirect(w, req, s.getAuthorizeData(req.ResponseType, ti))
+	reqid := guid.New().String()
+	s.reqCache.Set(reqid, req, time.Minute*10)
+	http.Redirect(w, r, "/#/approve?reqid="+reqid, http.StatusFound)
+}
+func (s *server) validateClientSettings(client *model.Client, req *AuthorizeRequest, r *http.Request) error {
+	if !client.Public {
+		if !s.checkTrustedPeer(client.TrustedPeers, r.RemoteAddr) {
+			return xerr.ErrUnauthorizedClient
+		}
+	}
+	if !client.Scopes.Contains(req.Scope) {
+		return xerr.ErrInvalidScope
+	}
+	if !client.RedirectURIs.Contains(req.RedirectURI) {
+		return xerr.ErrInvalidRedirectURI
+	}
+	return nil
+}
+func (s *server) checkTrustedPeer(trustedPeers []string, remoteAddr string) bool {
+	for _, tp := range trustedPeers {
+		if tp == remoteAddr {
+			return true
+		}
+	}
+	return false
 }
 func (s *server) validateAuthorizeRequest(r *http.Request) (*AuthorizeRequest, error) {
 	redirectURI := r.FormValue("redirect_uri")
@@ -124,7 +139,6 @@ func (s *server) validateAuthorizeRequest(r *http.Request) (*AuthorizeRequest, e
 		ClientID:            clientID,
 		State:               r.FormValue("state"),
 		Scope:               r.FormValue("scope"),
-		Request:             r,
 		CodeChallenge:       cc,
 		CodeChallengeMethod: ccm,
 	}
@@ -173,12 +187,12 @@ func (s *server) getAuthorizeToken(ctx context.Context, req *AuthorizeRequest) (
 	// }
 
 	tgr := &TokenGenerateRequest{
-		ClientID:       req.ClientID,
-		UserID:         req.UserID,
-		RedirectURI:    req.RedirectURI,
-		Scope:          req.Scope,
-		AccessTokenExp: req.AccessTokenExp,
-		Request:        req.Request,
+		// ClientID:       req.ClientID,
+		// UserID:         req.UserID,
+		// RedirectURI:    req.RedirectURI,
+		// Scope:          req.Scope,
+		// AccessTokenExp: req.AccessTokenExp,
+		// Request:        req.Request,
 	}
 
 	// check the client allows the authorized scope
@@ -323,7 +337,6 @@ func (s *server) redirect(w http.ResponseWriter, req *AuthorizeRequest, data map
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
-
 	w.Header().Set("Location", uri)
 	w.WriteHeader(302)
 }

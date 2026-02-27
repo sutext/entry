@@ -4,6 +4,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"slices"
+	"strings"
 
 	"gorm.io/gorm"
 	"sutext.github.io/suid"
@@ -14,7 +15,7 @@ func AutoMigrate(db *gorm.DB) {
 		&KeyRecord{},
 		&User{},
 		&Client{},
-		&UserToken{},
+		&AccessToken{},
 		&AuthRequest{},
 		&RefreshToken{},
 		&AuthCode{},
@@ -24,7 +25,13 @@ func AutoMigrate(db *gorm.DB) {
 type Strings []string
 
 func (s Strings) Contains(v string) bool {
-	return slices.Contains(s, v)
+	vs := strings.FieldsSeq(v)
+	for v := range vs {
+		if !slices.Contains(s, v) {
+			return false
+		}
+	}
+	return true
 }
 
 func (s *Strings) Scan(src any) error {
@@ -54,8 +61,8 @@ type PKCE struct {
 // Claims represents the ID Token claims supported by the server.
 type Claims struct {
 	UserID   suid.SUID
-	Username string
 	Email    string
+	Username string
 	Groups   []string
 }
 

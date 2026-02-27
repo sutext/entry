@@ -13,6 +13,8 @@ import (
 	"net/url"
 	"path"
 
+	"github.com/go-jose/go-jose/v4"
+	"sutext.github.io/entry/cache"
 	"sutext.github.io/entry/model"
 	"sutext.github.io/entry/view"
 	"sutext.github.io/entry/xerr"
@@ -40,7 +42,10 @@ type Server interface {
 type server struct {
 	db                            model.Storage
 	mux                           *http.ServeMux
+	reqCache                      cache.Cache[*AuthorizeRequest]
+	codeCache                     cache.Cache[string]
 	secret                        ed25519.PrivateKey
+	signer                        jose.Signer
 	logger                        *xlog.Logger
 	dirver                        model.Driver
 	endpoints                     endpints
@@ -71,9 +76,9 @@ func New(opts ...Option) Server {
 	}
 	s := &server{
 		mux:                           http.NewServeMux(),
+		reqCache:                      cache.NewMemory[*AuthorizeRequest](),
 		logger:                        options.logger,
 		dirver:                        options.dirver,
-		secret:                        ed25519.NewKeyFromSeed(seed),
 		issuerURL:                     *issuerURL,
 		allHeaders:                    options.allHeaders,
 		realIPHeader:                  options.realIPHeader,
@@ -83,6 +88,14 @@ func New(opts ...Option) Server {
 		supportedGrantTypes:           options.supportedGrantTypes,
 		supportedResponseTypes:        options.supportedResponseTypes,
 		supportedCodeChallengeMethods: options.supportedCodeChallengeMethods,
+	}
+	s.secret = ed25519.NewKeyFromSeed(seed)
+	s.signer, err = jose.NewSigner(jose.SigningKey{
+		Algorithm: jose.EdDSA,
+		Key:       s.secret,
+	}, nil)
+	if err != nil {
+		panic(err)
 	}
 	s.endpoints = endpints{
 		JWKS:       "/oauth/keys",
@@ -112,6 +125,18 @@ func (s *server) Serve() error {
 	if err != nil {
 		return err
 	}
+	// client := model.Client{
+	// 	ID:           "222222",
+	// 	Status:       1,
+	// 	LogoURL:      "https://example.com/logo.png",
+	// 	Secret:       "22222222",
+	// 	Scopes:       []string{"all", "profile", "email"},
+	// 	Public:       true,
+	// 	Description:  "This a test client",
+	// 	RedirectURIs: []string{"http://localhost:9094/oauth2"},
+	// }
+	// s.db.CreateClient(context.Background(), &client)
+
 	s.mux.Handle("/", fss)
 	s.mux.HandleFunc(s.endpoints.Logout, s.handleLogout)
 	s.mux.HandleFunc(s.endpoints.Discovery, s.handleDiscovery)
@@ -227,7 +252,6 @@ func (s *server) getErrorData(err error) (map[string]any, int, http.Header) {
 				re = *v
 			}
 		}
-
 		if re.Error == nil {
 			re.Error = xerr.ErrServerError
 			re.Description = xerr.Descriptions[xerr.ErrServerError]

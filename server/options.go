@@ -33,6 +33,19 @@ func newOptions(opts ...Option) *options {
 		addr:   ":8080",
 		secret: "R7xWhPNWejiOzxHPuiD2SRsvOwF81xWXcbxUJtXlG7A=",
 		logger: xlog.NewText(xlog.LevelInfo),
+		supportedResponseTypes: map[string]struct{}{
+			ResponseTypeCode.String(): {},
+		},
+		supportedCodeChallengeMethods: map[string]struct{}{
+			CodeChallengePlain.String(): {},
+			CodeChallengeS256.String():  {},
+		},
+		supportedGrantTypes: map[string]struct{}{
+			AuthorizationCode.String():   {},
+			PasswordCredentials.String(): {},
+			ClientCredentials.String():   {},
+			Refreshing.String():          {},
+		},
 	}
 	for _, o := range opts {
 		o.apply(os)

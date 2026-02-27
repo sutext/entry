@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useSearchParams,useNavigate } from 'react-router-dom';
 import { 
   CheckCircle2, 
   ShieldCheck, 
@@ -12,10 +12,10 @@ import { approve } from './Service';
 
 const Approve = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
-
   const handleApprove = () => {
-     approve().then(() => {
+     approve(searchParams).then(() => {
       setIsLoading(false);
       navigate('/profile');
     }).catch(() => {

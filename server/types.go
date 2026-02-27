@@ -28,11 +28,8 @@ type AuthorizeRequest struct {
 	Scope               string
 	RedirectURI         string
 	State               string
-	UserID              string
 	CodeChallenge       string
 	CodeChallengeMethod CodeChallengeMethod
-	AccessTokenExp      time.Duration
-	Request             *http.Request
 }
 
 // ResponseType the type of authorization request

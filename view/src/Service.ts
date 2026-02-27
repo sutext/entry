@@ -14,7 +14,8 @@ export type RegisterFormData = {
   email: string;
   password: string;
 };
-
+const TokenKey = 'token';
+export const getToken = () => localStorage.getItem(TokenKey);
 export const register = async (formData: RegisterFormData) => {
   const res = await fetch('/register', {
         method: 'POST',
@@ -25,7 +26,7 @@ export const register = async (formData: RegisterFormData) => {
     });
     if (res.status === 200) {
         return res.json().then((data) => {
-            localStorage.setItem('user_token', data.token);
+            localStorage.setItem(TokenKey, data.token);
             return data.user as User;
         });
     } else {
@@ -47,7 +48,7 @@ export const login = async (formData: LoginFormData) => {
     });
     if (res.status === 200) {
         return res.json().then((data) => {
-            localStorage.setItem('user_token', data.token);
+            localStorage.setItem(TokenKey, data.token);
             return data.user as User;
         });
     } else {
@@ -55,12 +56,12 @@ export const login = async (formData: LoginFormData) => {
     }
 }
 
-export const approve = async ()=>{
-    const token = localStorage.getItem('user_token');
+export const approve = async (search: URLSearchParams)=>{
+    const token = localStorage.getItem(TokenKey);
     if (!token) {
         throw new Error('请先登录。');
     }
-    const res = await fetch('/approve', {
+    const res = await fetch(`/approve?${search.toString()}`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
@@ -77,7 +78,7 @@ export const approve = async ()=>{
 }
 
 export const profile = async () => {
-    const token = localStorage.getItem('user_token');
+    const token = localStorage.getItem(TokenKey);
     if (!token) {
         throw new Error('请先登录。');
     }

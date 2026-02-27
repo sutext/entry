@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate,useSearchParams } from 'react-router-dom';
 import { 
   Lock, 
   ChevronRight, 
@@ -14,14 +14,19 @@ const Login = ({ onLogin }: { onLogin: () => void }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-
+  const [searchParams] = useSearchParams();
   const handleLogin = (e:React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
     login({ email, password }).then(() => {
       setIsLoading(false);
       onLogin();
-      navigate('/profile');
+      const reqid = searchParams.get('reqid');
+      if (reqid && reqid !== '') {
+        navigate(`/approve?reqid=${reqid}`);
+      } else {
+        navigate('/profile');
+      }
     }).catch(() => {
       setIsLoading(false);
       alert('登录失败，请重试。');
