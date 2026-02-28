@@ -8,6 +8,7 @@ import (
 type Cache[T any] interface {
 	Get(key string) (T, error)
 	Set(key string, value T, ttl time.Duration) error
+	Delete(key string) error
 }
 
 type memoryCache[T any] struct {
@@ -31,5 +32,9 @@ func (c *memoryCache[T]) Get(key string) (T, error) {
 
 func (c *memoryCache[T]) Set(key string, value T, ttl time.Duration) error {
 	c.cache[key] = value
+	return nil
+}
+func (c *memoryCache[T]) Delete(key string) error {
+	delete(c.cache, key)
 	return nil
 }

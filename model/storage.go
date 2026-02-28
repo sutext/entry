@@ -5,6 +5,7 @@ import (
 
 	"gorm.io/gorm"
 	"sutext.github.io/suid"
+	"sutext.github.io/suid/guid"
 )
 
 // Kubernetes only allows lower case letters for names.
@@ -70,11 +71,11 @@ type Storage interface {
 	DeleteAuthCode(ctx context.Context, id string) error
 	UpdateAuthCode(ctx context.Context, id string, updater func(c AuthCode) (AuthCode, error)) error
 
-	GetRefresh(ctx context.Context, id string) (RefreshToken, error)
+	GetRefresh(ctx context.Context, id guid.GUID) (RefreshToken, error)
 	GetRefreshByUserAndClient(ctx context.Context, userID suid.SUID, clientID string) (RefreshToken, error)
 	CreateRefresh(ctx context.Context, r RefreshToken) error
-	DeleteRefresh(ctx context.Context, id string) error
-	UpdateRefresh(ctx context.Context, id string, updater func(r RefreshToken) (RefreshToken, error)) error
+	DeleteRefresh(ctx context.Context, id guid.GUID) error
+	UpdateRefresh(ctx context.Context, id guid.GUID, updater func(r RefreshToken) (RefreshToken, error)) error
 
 	CreateTokenInfo(ctx context.Context) (*TokenInfo, error)
 }
@@ -276,7 +277,7 @@ func (s *storage) UpdateAuthCode(ctx context.Context, id string, updater func(c 
 }
 
 // Below is RefreshToken implementations
-func (s *storage) GetRefresh(ctx context.Context, id string) (RefreshToken, error) {
+func (s *storage) GetRefresh(ctx context.Context, id guid.GUID) (RefreshToken, error) {
 	var refresh RefreshToken
 	err := s.db.WithContext(ctx).First(&refresh, "id = ?", id).Error
 	if err != nil {
@@ -296,11 +297,11 @@ func (s *storage) CreateRefresh(ctx context.Context, r RefreshToken) error {
 	return s.db.WithContext(ctx).Create(r).Error
 }
 
-func (s *storage) DeleteRefresh(ctx context.Context, id string) error {
+func (s *storage) DeleteRefresh(ctx context.Context, id guid.GUID) error {
 	return s.db.WithContext(ctx).Delete(RefreshToken{}, "id = ?", id).Error
 }
 
-func (s *storage) UpdateRefresh(ctx context.Context, id string, updater func(r RefreshToken) (RefreshToken, error)) error {
+func (s *storage) UpdateRefresh(ctx context.Context, id guid.GUID, updater func(r RefreshToken) (RefreshToken, error)) error {
 	var refresh RefreshToken
 	err := s.db.WithContext(ctx).First(&refresh, "id = ?", id).Error
 	if err != nil {

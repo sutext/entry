@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useSearchParams,useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   CheckCircle2, 
   ShieldCheck, 
@@ -8,21 +8,33 @@ import {
   Smartphone 
 } from 'lucide-react';
 import { cardBaseStyles, Footer } from './Widgets';
-import { approve } from './Service';
+import { preview ,getOauthParams, getToken} from './Service';
 
 const Approve = () => {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const searchParams = getOauthParams();
   const [isLoading, setIsLoading] = useState(false);
-  const handleApprove = () => {
-     approve(searchParams).then(() => {
+  if (!searchParams) {
+    navigate('/login');
+  }
+  useEffect(() => {
+    preview(searchParams).then(data => {
       setIsLoading(false);
-      navigate('/profile');
+      console.log(data);
     }).catch(() => {
       setIsLoading(false);
-      alert('授权失败，请重试。');
+      alert('预览失败，请重试。');
     });
-  };
+  }, [searchParams]);
+  // const handleApprove = () => {
+  //    approve(searchParams).then(token => {
+  //     setIsLoading(false);
+  //     console.log(token)
+  //   }).catch(() => {
+  //     setIsLoading(false);
+  //     alert('授权失败，请重试。');
+  //   });
+  // };
 
   return (
     <div className={`${cardBaseStyles} animate-in fade-in zoom-in-95 duration-500`}>
@@ -66,10 +78,11 @@ const Approve = () => {
           </li>
         </ul>
       </div>
-
+      <form action={'/oauth/authorize/approve?' + searchParams} method="POST">
+      <input type="hidden" name="token" value={getToken()} />
       <div className="flex flex-col space-y-3">
         <button 
-          onClick={handleApprove}
+          type={'submit'}
           disabled={isLoading}
           className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3.5 rounded-xl shadow-lg shadow-blue-100 transition-all active:scale-[0.98] flex items-center justify-center"
         >
@@ -84,7 +97,7 @@ const Approve = () => {
           返回登录
         </button>
       </div>
-
+      </form>
       <div className="mt-8 flex items-center justify-center space-x-4 text-slate-400">
         <div className="flex items-center space-x-1">
           <Globe className="w-3.5 h-3.5" />

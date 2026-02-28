@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/netip"
+	"time"
 
 	"sutext.github.io/entry/model"
 	"sutext.github.io/entry/xlog"
@@ -23,6 +24,8 @@ type options struct {
 	allowedOrigins                []string
 	allowedHeaders                []string
 	trustedRealIPCIDRs            []*netip.Prefix
+	accessTokenDuration           time.Duration
+	refreshTokenDuration          time.Duration
 	supportedGrantTypes           map[string]struct{}
 	supportedResponseTypes        map[string]struct{}
 	supportedCodeChallengeMethods map[string]struct{}
@@ -30,9 +33,11 @@ type options struct {
 
 func newOptions(opts ...Option) *options {
 	os := &options{
-		addr:   ":8080",
-		secret: "R7xWhPNWejiOzxHPuiD2SRsvOwF81xWXcbxUJtXlG7A=",
-		logger: xlog.NewText(xlog.LevelInfo),
+		addr:                 ":8080",
+		secret:               "R7xWhPNWejiOzxHPuiD2SRsvOwF81xWXcbxUJtXlG7A=",
+		logger:               xlog.NewText(xlog.LevelInfo),
+		accessTokenDuration:  time.Hour * 2,
+		refreshTokenDuration: time.Hour * 24 * 7,
 		supportedResponseTypes: map[string]struct{}{
 			ResponseTypeCode.String(): {},
 		},

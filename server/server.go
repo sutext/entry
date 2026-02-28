@@ -12,6 +12,7 @@ import (
 	"net/netip"
 	"net/url"
 	"path"
+	"time"
 
 	"github.com/go-jose/go-jose/v4"
 	"sutext.github.io/entry/cache"
@@ -23,12 +24,13 @@ import (
 
 type endpints struct {
 	JWKS       string
-	Auth       string
+	Authorize  string
 	Token      string
 	Login      string
 	Logout     string
 	Device     string
 	Approve    string
+	Preview    string
 	Register   string
 	UserInfo   string
 	Discovery  string
@@ -42,20 +44,20 @@ type Server interface {
 type server struct {
 	db                            model.Storage
 	mux                           *http.ServeMux
-	reqCache                      cache.Cache[*AuthorizeRequest]
-	codeCache                     cache.Cache[string]
-	secret                        ed25519.PrivateKey
+	codeCache                     cache.Cache[*AuthorizeRequest]
+	secret                        ed25519.PublicKey
 	signer                        jose.Signer
 	logger                        *xlog.Logger
 	dirver                        model.Driver
 	endpoints                     endpints
 	issuerURL                     url.URL
-	forcePKCE                     bool
 	allHeaders                    http.Header
 	realIPHeader                  string
 	allowedOrigins                []string
 	allowedHeaders                []string
 	trustedRealIPCIDRs            []*netip.Prefix
+	accessTokenDuration           time.Duration
+	refreshTokenDuration          time.Duration
 	internalErrorHandler          func(error) *xerr.Response
 	supportedGrantTypes           map[string]struct{}
 	supportedResponseTypes        map[string]struct{}
@@ -76,7 +78,7 @@ func New(opts ...Option) Server {
 	}
 	s := &server{
 		mux:                           http.NewServeMux(),
-		reqCache:                      cache.NewMemory[*AuthorizeRequest](),
+		codeCache:                     cache.NewMemory[*AuthorizeRequest](),
 		logger:                        options.logger,
 		dirver:                        options.dirver,
 		issuerURL:                     *issuerURL,
@@ -84,27 +86,31 @@ func New(opts ...Option) Server {
 		realIPHeader:                  options.realIPHeader,
 		allowedOrigins:                options.allowedOrigins,
 		allowedHeaders:                options.allowedHeaders,
+		accessTokenDuration:           options.accessTokenDuration,
+		refreshTokenDuration:          options.refreshTokenDuration,
 		trustedRealIPCIDRs:            options.trustedRealIPCIDRs,
 		supportedGrantTypes:           options.supportedGrantTypes,
 		supportedResponseTypes:        options.supportedResponseTypes,
 		supportedCodeChallengeMethods: options.supportedCodeChallengeMethods,
 	}
-	s.secret = ed25519.NewKeyFromSeed(seed)
+	secret := ed25519.NewKeyFromSeed(seed)
 	s.signer, err = jose.NewSigner(jose.SigningKey{
 		Algorithm: jose.EdDSA,
-		Key:       s.secret,
+		Key:       secret,
 	}, nil)
+	s.secret = secret.Public().(ed25519.PublicKey)
 	if err != nil {
 		panic(err)
 	}
 	s.endpoints = endpints{
 		JWKS:       "/oauth/keys",
-		Auth:       "/oauth/authorize",
-		Login:      "/login",
-		Logout:     "/logout",
 		Token:      "/oauth/token",
 		Device:     "/oauth/device/code",
-		Approve:    "/approve",
+		Authorize:  "/oauth/authorize",
+		Preview:    "/oauth/authorize/preview",
+		Approve:    "/oauth/authorize/approve",
+		Login:      "/login",
+		Logout:     "/logout",
 		Register:   "/register",
 		UserInfo:   "/oauth/userinfo",
 		Discovery:  "/.well-known/openid-configuration",
@@ -143,8 +149,9 @@ func (s *server) Serve() error {
 	s.mux.HandleFunc(s.endpoints.Login, s.handleLogin)
 	s.mux.HandleFunc(s.endpoints.Token, s.handleToken)
 	s.mux.HandleFunc(s.endpoints.Register, s.handleRegister)
-	s.mux.HandleFunc(s.endpoints.Auth, s.handleAuthorize)
-	s.mux.HandleFunc(s.endpoints.Approve, s.handleApprove)
+	s.mux.HandleFunc(s.endpoints.Authorize, s.handleAuthorize)
+	s.mux.HandleFunc(s.endpoints.Approve, s.handleAuthorizeApprove)
+	s.mux.HandleFunc(s.endpoints.Preview, s.handleAuthorizePreview)
 	return http.ListenAndServe(":8080", s.mux)
 }
 func (s *server) Shoutdown(ctx context.Context) error {

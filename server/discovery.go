@@ -38,7 +38,7 @@ func (s *server) handleDiscovery(w http.ResponseWriter, r *http.Request) {
 func (s *server) constructDiscovery() discovery {
 	d := discovery{
 		Issuer:             s.issuerURL.String(),
-		AuthEndpoint:       s.endpoints.Auth,
+		AuthEndpoint:       s.endpoints.Authorize,
 		TokenEndpoint:      s.endpoints.Token,
 		JwksURI:            s.endpoints.JWKS,
 		UserInfoEndpoint:   s.endpoints.UserInfo,

@@ -9,6 +9,7 @@ import (
 	"github.com/go-jose/go-jose/v4"
 	"sutext.github.io/entry/scope"
 	"sutext.github.io/suid"
+	"sutext.github.io/suid/guid"
 )
 
 type AccessToken struct {
@@ -22,15 +23,14 @@ type AccessToken struct {
 // RefreshToken is an OAuth2 refresh token which allows a client to request new
 // tokens on the end user's behalf.
 type RefreshToken struct {
-	ID           string `gorm:"primary_key"`
-	UserID       suid.SUID
-	ClientID     string
-	RefreshToken string
-	CreatedAt    time.Time
-	LastUsed     time.Time
-	Claims       Claims
-	Scopes       scope.Scopes
-	Nonce        string
+	ID        guid.GUID `json:"id" gorm:"primary_key"`
+	UserID    suid.SUID `json:"user_id"`
+	ClientID  string    `json:"client_id"`
+	Nonce     string    `json:"nonce"`
+	Scope     string    `json:"scope"`
+	ExpiryIn  time.Time `json:"expiry_in"`
+	LastUsed  time.Time `json:"last_used"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 // VerificationKey is a rotated signing key which can still be used to verify

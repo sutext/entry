@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"sutext.github.io/suid"
 )
 
 type TokenGenerateRequest struct {
@@ -25,6 +27,7 @@ type TokenGenerateRequest struct {
 type AuthorizeRequest struct {
 	ResponseType        ResponseType
 	ClientID            string
+	UserID              suid.SUID
 	Scope               string
 	RedirectURI         string
 	State               string

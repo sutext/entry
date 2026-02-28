@@ -10,5 +10,5 @@ type Client struct {
 	LogoURL      string  `json:"logo_url,omitempty"`
 	Description  string  `json:"description"`
 	RedirectURIs Strings `json:"redirect_uris"`
-	TrustedPeers Strings `json:"trusted_peers,omitempty"` // TrustedPeers holds the value of the "trusted_peers" field.
+	TrustedPeers Strings `json:"trusted_peers,omitempty"`
 }

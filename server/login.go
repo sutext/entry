@@ -10,6 +10,7 @@ import (
 	"github.com/go-jose/go-jose/v4/jwt"
 	"golang.org/x/crypto/bcrypt"
 	"sutext.github.io/entry/model"
+	"sutext.github.io/suid"
 )
 
 type loginRequest struct {
@@ -42,7 +43,7 @@ func (s *server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		s.writeError(w, http.StatusUnauthorized, "invalid email or password")
 		return
 	}
-	token, err := s.generateToken(user)
+	token, err := s.createUserToken(user.ID)
 	if err != nil {
 		s.writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -91,7 +92,7 @@ func (s *server) handleRegister(w http.ResponseWriter, r *http.Request) {
 		s.writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-	token, err := s.generateToken(user)
+	token, err := s.createUserToken(user.ID)
 	if err != nil {
 		s.writeError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -114,40 +115,39 @@ func (s *server) handleLogout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
-func (s *server) generateToken(user *model.User) (string, error) {
-	builder := jwt.Signed(s.signer)
-	builder.Claims(jwt.Claims{
-		Subject:  user.ID.String(),
-		Expiry:   jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+func (s *server) createUserToken(userID suid.SUID) (string, error) {
+	return jwt.Signed(s.signer).Claims(jwt.Claims{
+		Subject:  userID.String(),
+		Expiry:   jwt.NewNumericDate(time.Now().Add(s.accessTokenDuration)),
 		IssuedAt: jwt.NewNumericDate(time.Now()),
-	})
-	return builder.Serialize()
+	}).Serialize()
 }
 func (s *server) getToken(r *http.Request) (string, error) {
-	if cookie, err := r.Cookie("token"); err == nil {
-		return cookie.Value, nil
+	token := r.FormValue("token")
+	if token != "" {
+		return token, nil
 	}
-	token := r.Header.Get("Authorization")
+	token = r.Header.Get("Authorization")
 	if token == "" {
 		return "", fmt.Errorf("missing authorization token")
 	}
 	token = token[len("Bearer "):]
 	return token, nil
 }
-func (s *server) ensureLoggedIn(r *http.Request) (string, error) {
+func (s *server) ensureLoggedIn(r *http.Request) (uid suid.SUID, err error) {
 	token, err := s.getToken(r)
 	if err != nil {
-		return "", err
+		return uid, err
 	}
 	tok, err := jwt.ParseSigned(token, []jose.SignatureAlgorithm{jose.EdDSA})
 	if err != nil {
-		return "", err
+		return uid, err
 	}
 	var claims jwt.Claims
-	if err = tok.Claims(s.secret.Public(), &claims); err != nil {
-		return "", err
+	if err = tok.Claims(s.secret, &claims); err != nil {
+		return uid, err
 	}
-	return claims.Subject, nil
+	return suid.Parse(claims.Subject)
 }
 func (s *server) writeError(w http.ResponseWriter, code int, msg string) {
 	http.Error(w, msg, code)

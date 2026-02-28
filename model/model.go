@@ -61,9 +61,7 @@ type PKCE struct {
 // Claims represents the ID Token claims supported by the server.
 type Claims struct {
 	UserID   suid.SUID
-	Email    string
-	Username string
-	Groups   []string
+	ClientID string
 }
 
 func (p PKCE) Value() (driver.Value, error) {

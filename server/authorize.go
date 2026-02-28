@@ -2,10 +2,11 @@ package server
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
-	"os"
+	"strings"
 	"time"
 
 	"sutext.github.io/entry/model"
@@ -13,30 +14,82 @@ import (
 	"sutext.github.io/suid/guid"
 )
 
-func (s *server) handleApprove(w http.ResponseWriter, r *http.Request) {
-	err := dumpRequest(w, "Request", r)
+func (s *server) handleAuthorize(w http.ResponseWriter, r *http.Request) {
+	respType := ResponseType(r.FormValue("response_type"))
+	if respType.String() == "" {
+		http.Error(w, "response_type is empty", http.StatusBadRequest)
+		return
+	}
+	if respType != ResponseTypeCode {
+		http.Error(w, "only support response type code", http.StatusBadRequest)
+		return
+	}
+	http.Redirect(w, r, "/#/approve?"+r.Form.Encode(), http.StatusFound)
+}
+
+type PreviewResponse struct {
+	Scopes     []string `json:"scopes"`
+	ClientID   string   `json:"client_id"`
+	ClientName string   `json:"client_name"`
+	ClientLogo string   `json:"client_logo"`
+}
+
+func (s *server) handleAuthorizePreview(w http.ResponseWriter, r *http.Request) {
+	_, err := s.ensureLoggedIn(r)
 	if err != nil {
-		http.Error(w, "failed to dump request: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "failed to ensure logged in: "+err.Error(), http.StatusUnauthorized)
 		return
 	}
-	reqid := r.URL.Query().Get("reqid")
-	if reqid == "" {
-		http.Error(w, "reqid is empty", http.StatusBadRequest)
-		return
-	}
-	req, err := s.reqCache.Get(reqid)
+	req, err := s.validateAuthorizeRequest(r)
 	if err != nil {
-		http.Error(w, "reqid not found: "+err.Error(), http.StatusBadRequest)
+		http.Error(w, "failed to validate authorize request: "+err.Error(), http.StatusBadRequest)
 		return
 	}
+	client, err := s.db.GetClient(r.Context(), req.ClientID)
+	if err != nil {
+		http.Error(
+			w,
+			fmt.Sprintf("failed to get client %s: %s", req.ClientID, err.Error()),
+			http.StatusInternalServerError,
+		)
+		return
+	}
+	if err := s.validateClientSettings(client, req, r); err != nil {
+		http.Error(
+			w,
+			fmt.Sprintf("failed to validate client settings: %s", err.Error()),
+			http.StatusBadRequest,
+		)
+		return
+	}
+	resp := PreviewResponse{
+		Scopes:     strings.Split(req.Scope, " "),
+		ClientID:   req.ClientID,
+		ClientName: client.Name,
+		ClientLogo: client.LogoURL,
+	}
+	e := json.NewEncoder(w)
+	e.SetIndent("", "  ")
+	if err := e.Encode(resp); err != nil {
+		http.Error(w, "failed to encode preview response: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+func (s *server) handleAuthorizeApprove(w http.ResponseWriter, r *http.Request) {
 	userID, err := s.ensureLoggedIn(r)
 	if err != nil {
-		w.Header().Set("Location", "/#/login?reqid="+reqid)
-		w.WriteHeader(http.StatusFound)
+		http.Redirect(w, r, "/#/login?"+r.Form.Encode(), http.StatusFound)
 		return
 	}
+	req, err := s.validateAuthorizeRequest(r)
+	if err != nil {
+		http.Error(w, "failed to validate authorize request: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	req.UserID = userID
 	code := guid.New().String()
-	s.codeCache.Set(code, userID, time.Minute*10)
+	s.codeCache.Set(code, req, time.Minute*10)
 	u, err := url.Parse(req.RedirectURI)
 	if err != nil {
 		s.redirectError(w, req, err)
@@ -50,35 +103,7 @@ func (s *server) handleApprove(w http.ResponseWriter, r *http.Request) {
 	u.RawQuery = q.Encode()
 	http.Redirect(w, r, u.String(), http.StatusFound)
 }
-func (s *server) handleAuthorize(w http.ResponseWriter, r *http.Request) {
-	err := dumpRequest(os.Stdout, "Request", r)
-	if err != nil {
-		http.Error(w, "failed to dump request: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	ctx := r.Context()
-	req, err := s.validateAuthorizeRequest(r)
-	if err != nil {
-		http.Error(w, "failed to validate authorize request: "+err.Error(), http.StatusBadRequest)
-		return
-	}
-	if req.ResponseType != ResponseTypeCode {
-		http.Error(w, "only support response type code", http.StatusBadRequest)
-		return
-	}
-	client, err := s.db.GetClient(ctx, req.ClientID)
-	if err != nil {
-		s.redirectError(w, req, err)
-		return
-	}
-	if err := s.validateClientSettings(client, req, r); err != nil {
-		s.redirectError(w, req, err)
-		return
-	}
-	reqid := guid.New().String()
-	s.reqCache.Set(reqid, req, time.Minute*10)
-	http.Redirect(w, r, "/#/approve?reqid="+reqid, http.StatusFound)
-}
+
 func (s *server) validateClientSettings(client *model.Client, req *AuthorizeRequest, r *http.Request) error {
 	if !client.Public {
 		if !s.checkTrustedPeer(client.TrustedPeers, r.RemoteAddr) {
@@ -117,7 +142,7 @@ func (s *server) validateAuthorizeRequest(r *http.Request) (*AuthorizeRequest, e
 	}
 
 	cc := r.FormValue("code_challenge")
-	if cc == "" && s.forcePKCE {
+	if cc == "" {
 		return nil, xerr.ErrCodeChallengeRquired
 	}
 	if cc != "" && (len(cc) < 43 || len(cc) > 128) {
