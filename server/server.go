@@ -44,6 +44,7 @@ type Server interface {
 type server struct {
 	db                            model.Storage
 	mux                           *http.ServeMux
+	reqCache                      cache.Cache[*AuthorizeRequest]
 	codeCache                     cache.Cache[*AuthorizeRequest]
 	secret                        ed25519.PublicKey
 	signer                        jose.Signer
@@ -78,6 +79,7 @@ func New(opts ...Option) Server {
 	}
 	s := &server{
 		mux:                           http.NewServeMux(),
+		reqCache:                      cache.NewMemory[*AuthorizeRequest](),
 		codeCache:                     cache.NewMemory[*AuthorizeRequest](),
 		logger:                        options.logger,
 		dirver:                        options.dirver,
@@ -107,8 +109,8 @@ func New(opts ...Option) Server {
 		Token:      "/oauth/token",
 		Device:     "/oauth/device/code",
 		Authorize:  "/oauth/authorize",
-		Preview:    "/oauth/authorize/preview",
 		Approve:    "/oauth/authorize/approve",
+		Preview:    "/oauth/authorize/preview",
 		Login:      "/login",
 		Logout:     "/logout",
 		Register:   "/register",
@@ -150,8 +152,8 @@ func (s *server) Serve() error {
 	s.mux.HandleFunc(s.endpoints.Token, s.handleToken)
 	s.mux.HandleFunc(s.endpoints.Register, s.handleRegister)
 	s.mux.HandleFunc(s.endpoints.Authorize, s.handleAuthorize)
-	s.mux.HandleFunc(s.endpoints.Approve, s.handleAuthorizeApprove)
 	s.mux.HandleFunc(s.endpoints.Preview, s.handleAuthorizePreview)
+	s.mux.HandleFunc(s.endpoints.Approve, s.handleAuthorizeApprove)
 	return http.ListenAndServe(":8080", s.mux)
 }
 func (s *server) Shoutdown(ctx context.Context) error {

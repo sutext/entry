@@ -123,11 +123,7 @@ func (s *server) createUserToken(userID suid.SUID) (string, error) {
 	}).Serialize()
 }
 func (s *server) getToken(r *http.Request) (string, error) {
-	token := r.FormValue("token")
-	if token != "" {
-		return token, nil
-	}
-	token = r.Header.Get("Authorization")
+	token := r.Header.Get("Authorization")
 	if token == "" {
 		return "", fmt.Errorf("missing authorization token")
 	}

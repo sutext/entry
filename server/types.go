@@ -25,6 +25,7 @@ type TokenGenerateRequest struct {
 	Request             *http.Request
 }
 type AuthorizeRequest struct {
+	ID                  string
 	ResponseType        ResponseType
 	ClientID            string
 	UserID              suid.SUID

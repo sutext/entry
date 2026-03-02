@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import {  Footer } from "./Widgets";
 import { ArrowLeft, Calendar, Camera, LogOut, Mail, Phone, Ruler, Shield, User, Weight, type LucideProps } from "lucide-react";
 import React from "react";
-import { profile } from "./Service";
+import { profile, ServerError } from "./Service";
 
 /* eslint-disable @typescript-eslint/no-unused-vars */
 
@@ -33,10 +33,14 @@ const Profile = ({ onLogout }: { onLogout: () => void }) => {
         weight: `${user.weight/1000} kg`,
         lastLogin: new Date(user.lastLogin).toLocaleString()
       });
-    }).catch(() => {
-      alert('获取用户信息失败，请重试。');
+    }).catch((err) => {
+      if (err instanceof ServerError && err.status === 401) {
+        navigate('/login');
+      } else {
+        alert('获取用户信息失败，请重试。');
+      }
     });
-  }, []);
+  });
 
   return (
     <div className="w-full min-h-screen bg-slate-50/50 flex flex-col animate-in fade-in duration-500">

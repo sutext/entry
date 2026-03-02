@@ -14,37 +14,51 @@ import (
 	"sutext.github.io/suid/guid"
 )
 
-func (s *server) handleAuthorize(w http.ResponseWriter, r *http.Request) {
-	respType := ResponseType(r.FormValue("response_type"))
-	if respType.String() == "" {
-		http.Error(w, "response_type is empty", http.StatusBadRequest)
-		return
-	}
-	if respType != ResponseTypeCode {
-		http.Error(w, "only support response type code", http.StatusBadRequest)
-		return
-	}
-	http.Redirect(w, r, "/#/approve?"+r.Form.Encode(), http.StatusFound)
-}
-
 type PreviewResponse struct {
+	ReqID      string   `json:"reqid"`
 	Scopes     []string `json:"scopes"`
 	ClientID   string   `json:"client_id"`
 	ClientName string   `json:"client_name"`
 	ClientLogo string   `json:"client_logo"`
 }
 
-func (s *server) handleAuthorizePreview(w http.ResponseWriter, r *http.Request) {
-	_, err := s.ensureLoggedIn(r)
-	if err != nil {
-		http.Error(w, "failed to ensure logged in: "+err.Error(), http.StatusUnauthorized)
-		return
-	}
+func (s *server) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 	req, err := s.validateAuthorizeRequest(r)
 	if err != nil {
 		http.Error(w, "failed to validate authorize request: "+err.Error(), http.StatusBadRequest)
 		return
 	}
+	if req.ResponseType != ResponseTypeCode {
+		http.Error(w, "unsupported response type", http.StatusBadRequest)
+		return
+	}
+	s.reqCache.Set(req.ID, req, time.Minute*10)
+	http.Redirect(w, r, "/#/approve?reqid="+req.ID, http.StatusFound)
+}
+func (s *server) handleAuthorizePreview(w http.ResponseWriter, r *http.Request) {
+	var err error
+	var req *AuthorizeRequest
+	reqid := r.FormValue("reqid")
+	if reqid != "" {
+		req, err = s.reqCache.Get(reqid)
+		if err != nil {
+			http.Error(w, "reqid not found", http.StatusBadRequest)
+			return
+		}
+	} else {
+		req, err = s.validateAuthorizeRequest(r)
+		if err != nil {
+			http.Error(w, "failed to validate authorize request: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		s.reqCache.Set(req.ID, req, time.Minute*10)
+	}
+	userID, err := s.ensureLoggedIn(r)
+	if err != nil {
+		http.Error(w, "authorize failed: "+err.Error(), http.StatusUnauthorized)
+		return
+	}
+	req.UserID = userID
 	client, err := s.db.GetClient(r.Context(), req.ClientID)
 	if err != nil {
 		http.Error(
@@ -63,6 +77,7 @@ func (s *server) handleAuthorizePreview(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	resp := PreviewResponse{
+		ReqID:      req.ID,
 		Scopes:     strings.Split(req.Scope, " "),
 		ClientID:   req.ClientID,
 		ClientName: client.Name,
@@ -76,18 +91,21 @@ func (s *server) handleAuthorizePreview(w http.ResponseWriter, r *http.Request) 
 	}
 }
 func (s *server) handleAuthorizeApprove(w http.ResponseWriter, r *http.Request) {
-	userID, err := s.ensureLoggedIn(r)
-	if err != nil {
-		http.Redirect(w, r, "/#/login?"+r.Form.Encode(), http.StatusFound)
+	reqid := r.FormValue("reqid")
+	if reqid == "" {
+		http.Error(w, "reqid is empty", http.StatusBadRequest)
 		return
 	}
-	req, err := s.validateAuthorizeRequest(r)
+	req, err := s.reqCache.Get(reqid)
 	if err != nil {
-		http.Error(w, "failed to validate authorize request: "+err.Error(), http.StatusBadRequest)
+		http.Error(w, "reqid not found", http.StatusBadRequest)
 		return
 	}
-
-	req.UserID = userID
+	if req.UserID == 0 {
+		http.Error(w, "preview is required", http.StatusBadRequest)
+		return
+	}
+	s.reqCache.Delete(reqid)
 	code := guid.New().String()
 	s.codeCache.Set(code, req, time.Minute*10)
 	u, err := url.Parse(req.RedirectURI)
@@ -159,6 +177,7 @@ func (s *server) validateAuthorizeRequest(r *http.Request) (*AuthorizeRequest, e
 	}
 
 	req := &AuthorizeRequest{
+		ID:                  guid.New().String(),
 		RedirectURI:         redirectURI,
 		ResponseType:        resType,
 		ClientID:            clientID,

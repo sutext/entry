@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/go-jose/go-jose/v4/jwt"
+	"golang.org/x/crypto/bcrypt"
 	"sutext.github.io/entry/model"
 	"sutext.github.io/entry/xerr"
 	"sutext.github.io/suid/guid"
@@ -38,6 +39,13 @@ func (s *server) handleToken(w http.ResponseWriter, r *http.Request) {
 		s.token(w, data, nil, http.StatusOK)
 	case ClientCredentials:
 		data, err := s.validateClientCredentialsGrant(r)
+		if err != nil {
+			s.tokenError(w, err)
+			return
+		}
+		s.token(w, data, nil, http.StatusOK)
+	case PasswordCredentials:
+		data, err := s.validatePasswordCredentialsGrant(r)
 		if err != nil {
 			s.tokenError(w, err)
 			return
@@ -201,6 +209,34 @@ func (s *server) validateClientCredentialsGrant(r *http.Request) (data map[strin
 	}
 	claims := jwt.Claims{
 		Subject:  clientID,
+		Expiry:   jwt.NewNumericDate(time.Now().Add(s.accessTokenDuration)),
+		IssuedAt: jwt.NewNumericDate(time.Now()),
+	}
+	accessToken, err := jwt.Signed(s.signer).Claims(claims).Serialize()
+	if err != nil {
+		return data, err
+	}
+	data = map[string]any{
+		"token_type":   "Bearer",
+		"access_token": accessToken,
+	}
+	return data, nil
+}
+func (s *server) validatePasswordCredentialsGrant(r *http.Request) (data map[string]any, err error) {
+	ctx := r.Context()
+	username, password, ok := r.BasicAuth()
+	if !ok {
+		return data, xerr.ErrUnauthorizedClient
+	}
+	user, err := s.db.GetUserByUsername(ctx, username)
+	if err != nil {
+		return data, err
+	}
+	if err = bcrypt.CompareHashAndPassword([]byte(user.Hash), []byte(password)); err != nil {
+		return data, xerr.ErrUnauthorizedClient
+	}
+	claims := jwt.Claims{
+		Subject:  user.ID.String(),
 		Expiry:   jwt.NewNumericDate(time.Now().Add(s.accessTokenDuration)),
 		IssuedAt: jwt.NewNumericDate(time.Now()),
 	}

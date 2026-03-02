@@ -15,20 +15,22 @@ import Register from './Register';
 import Profile from './Profile';
 import { useState } from 'react';
 import Root from './Root';
-import { getToken, setOauthParams } from './Service';
+import { getToken } from './Service';
 
 const Protected = ({ children, isAuthenticated }: { children: React.ReactNode, isAuthenticated: boolean }) => {
+  const [searchParams] = useSearchParams();
+  const reqid = searchParams.get('reqid') || '';
   if (!isAuthenticated) {    
-    return <Navigate to='/login' replace />;
+    if (reqid === '') {
+      return <Navigate to='/login' replace />;
+    } else {
+      return <Navigate to={`/login?reqid=${reqid}`} replace />;
+    }
   }
   return children;
 };
 
 const AppContent = () => {
-  const [searchParams] = useSearchParams();
-  if (searchParams.size > 0){
-      setOauthParams(searchParams.toString());
-  }
   const [isAuthenticated, setIsAuthenticated] = useState(getToken() !== '');
   const { pathname } = useLocation();
   const isFullscreenLayout = pathname === '/' || pathname === '/profile' || !['/', '/login', '/register', '/approve', '/profile'].includes(pathname);

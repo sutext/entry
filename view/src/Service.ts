@@ -14,10 +14,6 @@ export type RegisterFormData = {
   email: string;
   password: string;
 };
-const oauthKey = 'oauth_params';
-export const getOauthParams = () => sessionStorage.getItem(oauthKey) || '';
-export const setOauthParams = (params: string) => sessionStorage.setItem(oauthKey, params);
-export const clearOauthParams = () => sessionStorage.removeItem(oauthKey);
 const TokenKey = 'token';
 export const clearToken = () => localStorage.removeItem(TokenKey);
 export const getToken = () => localStorage.getItem(TokenKey) || '';
@@ -43,7 +39,6 @@ export type LoginFormData = {
   password: string;
 };
 export const login = async (formData: LoginFormData) => {
-
     const res = await fetch('/login', {
         method: 'POST',
         headers: {
@@ -57,7 +52,7 @@ export const login = async (formData: LoginFormData) => {
             return data.user as User;
         });
     } else {
-        throw new Error('登录失败，请重试。');
+        throw new ServerError(res.status, res.statusText);
     }
 }
 export type PreviewResponse = {
@@ -66,12 +61,19 @@ export type PreviewResponse = {
   clientName: string;
   clientLogo: string;
 }
-export const preview = async (search: string)=>{
+export class ServerError extends Error {
+    status: number;
+    constructor(status: number, message: string) {
+        super(message);
+        this.status = status;
+    }
+}
+export const preview = async (reqid: string)=>{
     const token = getToken()
-    if (!token) {
+    if (token === '') {
         throw new Error('请先登录。');
     }
-    const res = await fetch(`/oauth/authorize/preview?${search}`, {
+    const res = await fetch(`/oauth/authorize/preview?reqid=${reqid}`, {
         method: 'GET',
         headers: {
             'Content-Type': 'application/json',
@@ -83,33 +85,13 @@ export const preview = async (search: string)=>{
             return data as PreviewResponse;
         });
     } else {
-        throw new Error('预览失败，请重试。');
+        throw new ServerError(res.status, res.statusText);
     }
 
 }
-export const approve = async (search: string)=>{
-    const token = localStorage.getItem(TokenKey);
-    if (!token) {
-        throw new Error('请先登录。');
-    }
-    const res = await fetch(`/oauth/authorize/approve?${search}`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-        },
-    });
-    console.log(res);
-    if (res.status === 200) {
-        return res.json()
-    } else {
-        throw new Error('授权失败，请重试。');
-    }
-}
-
 export const profile = async () => {
-    const token = localStorage.getItem(TokenKey);
-    if (!token) {
+    const token = getToken();
+    if (token === '') {
         throw new Error('请先登录。');
     }
     const res = await fetch('/profile', {
@@ -124,6 +106,6 @@ export const profile = async () => {
             return data.user as User;
         });
     } else {
-        throw new Error('获取用户信息失败，请重试。');
+        throw new ServerError(res.status, res.statusText);
     }
 };

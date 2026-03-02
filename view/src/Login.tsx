@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   Lock, 
   ChevronRight, 
@@ -8,23 +8,24 @@ import {
   User, 
 } from 'lucide-react';
 import { cardBaseStyles, Footer } from './Widgets';
-import { getOauthParams, login } from './Service';
+import { login } from './Service';
 const Login = ({ onLogin }: { onLogin: () => void }) => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [searchParams] = useSearchParams();
   const handleLogin = (e:React.SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
     login({ email, password }).then(() => {
       setIsLoading(false);
       onLogin();
-      const hasOauthParams = !!getOauthParams();
-      if (hasOauthParams) {
-        navigate(`/approve`);
+      const reqid = searchParams.get('reqid') || '';
+      if (reqid === '') {
+          navigate('/profile');
       } else {
-        navigate('/profile');
+          navigate(`/approve?reqid=${reqid}`);
       }
     }).catch(() => {
       setIsLoading(false);

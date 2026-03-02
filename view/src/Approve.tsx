@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   CheckCircle2, 
   ShieldCheck, 
@@ -8,34 +8,29 @@ import {
   Smartphone 
 } from 'lucide-react';
 import { cardBaseStyles, Footer } from './Widgets';
-import { preview ,getOauthParams, getToken} from './Service';
+import { preview, ServerError} from './Service';
 
 const Approve = () => {
   const navigate = useNavigate();
-  const searchParams = getOauthParams();
+  const [searchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
-  if (!searchParams) {
+  const reqid = searchParams.get('reqid') || '';
+  if (reqid === '') {
     navigate('/login');
   }
   useEffect(() => {
-    preview(searchParams).then(data => {
+    preview(reqid).then(data => {
       setIsLoading(false);
       console.log(data);
-    }).catch(() => {
+    }).catch((err) => {
       setIsLoading(false);
-      alert('预览失败，请重试。');
+      if (err instanceof ServerError && err.status === 401) {
+        navigate('/login?reqid='+reqid);
+      } else {
+        alert('授权失败，请重试。');
+      }
     });
-  }, [searchParams]);
-  // const handleApprove = () => {
-  //    approve(searchParams).then(token => {
-  //     setIsLoading(false);
-  //     console.log(token)
-  //   }).catch(() => {
-  //     setIsLoading(false);
-  //     alert('授权失败，请重试。');
-  //   });
-  // };
-
+  });
   return (
     <div className={`${cardBaseStyles} animate-in fade-in zoom-in-95 duration-500`}>
       <div className="flex justify-between items-center mb-10 relative">
@@ -54,13 +49,13 @@ const Approve = () => {
           <span className="font-semibold text-slate-700">"Creative Studio"</span> 正在请求访问您的账号权限。
         </p>
       </div>
-
+      <form action={'/oauth/authorize/approve'} method="POST">
       <div className="bg-slate-50 rounded-2xl p-6 mb-8 border border-slate-100">
         <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4">该应用将能够：</p>
         <ul className="space-y-4">
           <li className="flex items-start space-x-3">
             <div className="mt-1 bg-green-100 rounded-full p-0.5">
-              <CheckCircle2 className="w-4 h-4 text-green-600" />
+              <CheckCircle2 className="w-4 h-4 text-green-600"  />
             </div>
             <div className="text-sm">
               <p className="font-medium text-slate-700">访问您的公开信息</p>
@@ -78,11 +73,12 @@ const Approve = () => {
           </li>
         </ul>
       </div>
-      <form action={'/oauth/authorize/approve?' + searchParams} method="POST">
-      <input type="hidden" name="token" value={getToken()} />
+      <input type="hidden" name="reqid" value={reqid} />
       <div className="flex flex-col space-y-3">
         <button 
           type={'submit'}
+          name="grant"
+          value={'true'}
           disabled={isLoading}
           className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-3.5 rounded-xl shadow-lg shadow-blue-100 transition-all active:scale-[0.98] flex items-center justify-center"
         >
@@ -91,10 +87,12 @@ const Approve = () => {
           ) : "授权并继续"}
         </button>
         <button 
-          onClick={() => navigate('/login')}
+          type={'submit'}
+          name="grant"
+          value={'false'}
           className="w-full bg-white hover:bg-slate-50 text-slate-500 font-medium py-3.5 rounded-xl border border-slate-200 transition-all active:scale-[0.98]"
         >
-          返回登录
+          拒绝并返回登录
         </button>
       </div>
       </form>
