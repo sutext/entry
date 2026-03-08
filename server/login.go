@@ -115,6 +115,29 @@ func (s *server) handleLogout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
+func (s *server) handleProfile(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		s.writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	ctx := r.Context()
+	userID, err := s.ensureLoggedIn(r)
+	if err != nil {
+		s.writeError(w, http.StatusUnauthorized, err.Error())
+		return
+	}
+	user, err := s.db.GetUser(ctx, userID)
+	if err != nil {
+		s.writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	enc := json.NewEncoder(w)
+	if err := enc.Encode(user.ToView()); err != nil {
+		s.writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
 func (s *server) createUserToken(userID suid.SUID) (string, error) {
 	return jwt.Signed(s.signer).Claims(jwt.Claims{
 		Subject:  userID.String(),

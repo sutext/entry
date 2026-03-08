@@ -3,45 +3,20 @@ import { useNavigate } from "react-router-dom";
 import {  Footer } from "./Widgets";
 import { ArrowLeft, Calendar, Camera, LogOut, Mail, Phone, Ruler, Shield, User, Weight, type LucideProps } from "lucide-react";
 import React from "react";
-import { profile, ServerError } from "./Service";
-
-/* eslint-disable @typescript-eslint/no-unused-vars */
+import { profile, ServerError, UserInfo } from "./Service";
 
 const Profile = ({ onLogout }: { onLogout: () => void }) => {
   const navigate = useNavigate();
-
-  const [user, setUser] = useState({
-    nickname: '张小帅',
-    email: 'zhang@example.com',
-    phone: '138 0013 8000',
-    gender: '男',
-    birthday: '1998-06-15',
-    height: '180 cm',
-    weight: '75 kg',
-    lastLogin: '2024-05-20 14:30'
-  });
-
+  const [user, setUser] = useState(new UserInfo({}));
   useEffect(() => {
-    profile().then((user) => {
-      setUser({
-        nickname: user.nickname,
-        email: user.email,
-        phone: user.phone,
-        gender: user.gender === 1 ? '男' : user.gender === 2 ? '女' : '保密',
-        birthday: new Date(user.birthday).toLocaleDateString(),
-        height: `${user.height} cm`,
-        weight: `${user.weight/1000} kg`,
-        lastLogin: new Date(user.lastLogin).toLocaleString()
-      });
-    }).catch((err) => {
+    profile().then(setUser).catch((err) => {
       if (err instanceof ServerError && err.status === 401) {
         navigate('/login');
       } else {
-        alert('获取用户信息失败，请重试。');
+        console.error('获取用户信息失败:', err);
       }
     });
-  });
-
+  },[]);
   return (
     <div className="w-full min-h-screen bg-slate-50/50 flex flex-col animate-in fade-in duration-500">
       {/* Top Header */}

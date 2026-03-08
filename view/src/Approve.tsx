@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { 
   CheckCircle2, 
   ShieldCheck, 
@@ -15,10 +15,10 @@ const Approve = () => {
   const [searchParams] = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
   const reqid = searchParams.get('reqid') || '';
-  if (reqid === '') {
-    navigate('/login');
-  }
   useEffect(() => {
+    if (reqid === '') {
+      return;
+    }
     preview(reqid).then(data => {
       setIsLoading(false);
       console.log(data);
@@ -27,10 +27,13 @@ const Approve = () => {
       if (err instanceof ServerError && err.status === 401) {
         navigate('/login?reqid='+reqid);
       } else {
-        alert('授权失败，请重试。');
+        console.error('授权失败:', err);
       }
     });
   });
+  if (reqid === '') {
+    return <Navigate to='/profile' replace />;
+  }
   return (
     <div className={`${cardBaseStyles} animate-in fade-in zoom-in-95 duration-500`}>
       <div className="flex justify-between items-center mb-10 relative">

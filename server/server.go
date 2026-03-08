@@ -29,6 +29,7 @@ type endpints struct {
 	Login      string
 	Logout     string
 	Device     string
+	Profile    string
 	Approve    string
 	Preview    string
 	Register   string
@@ -111,6 +112,7 @@ func New(opts ...Option) Server {
 		Authorize:  "/oauth/authorize",
 		Approve:    "/oauth/authorize/approve",
 		Preview:    "/oauth/authorize/preview",
+		Profile:    "/profile",
 		Login:      "/login",
 		Logout:     "/logout",
 		Register:   "/register",
@@ -150,6 +152,7 @@ func (s *server) Serve() error {
 	s.mux.HandleFunc(s.endpoints.Discovery, s.handleDiscovery)
 	s.mux.HandleFunc(s.endpoints.Login, s.handleLogin)
 	s.mux.HandleFunc(s.endpoints.Token, s.handleToken)
+	s.mux.HandleFunc(s.endpoints.Profile, s.handleProfile)
 	s.mux.HandleFunc(s.endpoints.Register, s.handleRegister)
 	s.mux.HandleFunc(s.endpoints.Authorize, s.handleAuthorize)
 	s.mux.HandleFunc(s.endpoints.Preview, s.handleAuthorizePreview)

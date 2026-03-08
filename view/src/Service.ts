@@ -1,14 +1,26 @@
-export type User = {
+export class UserInfo {
   id: number;
   email: string;
   nickname: string;
   phone: string;
-  gender: number;
-  birthday: number;
-  height: number;
-  weight: number;
+  gender: string;
+  birthday: string;
+  height: string;
+  weight: string;
   lastLogin: string;
   username: string;
+  constructor(user: any) {
+    this.id = user.id;
+    this.email = user.email || '';
+    this.nickname = user.nickname || '';
+    this.phone = user.phone || '';
+    this.gender = user.gender === 1 ? '男' : '女';
+    this.birthday = new Date(user.birthday || 0).toLocaleDateString();
+    this.height = user.height || 0 + "cm"; 
+    this.weight = (user.weight || 0)/1000 + "kg";
+    this.lastLogin = new Date(user.lastLogin || 0).toLocaleString();
+    this.username = user.username || '';
+  }
 };
 export type RegisterFormData = {
   email: string;
@@ -28,7 +40,7 @@ export const register = async (formData: RegisterFormData) => {
     if (res.status === 200) {
         return res.json().then((data) => {
             localStorage.setItem(TokenKey, data.token);
-            return data.user as User;
+            return new UserInfo(data.user);
         });
     } else {
         throw new Error('账号创建失败，请重试。');
@@ -49,7 +61,7 @@ export const login = async (formData: LoginFormData) => {
     if (res.status === 200) {
         return res.json().then((data) => {
             localStorage.setItem(TokenKey, data.token);
-            return data.user as User;
+            return new UserInfo(data.user);
         });
     } else {
         throw new ServerError(res.status, res.statusText);
@@ -103,7 +115,7 @@ export const profile = async () => {
     });
     if (res.status === 200) {
         return res.json().then((data) => {
-            return data.user as User;
+            return new UserInfo(data);
         });
     } else {
         throw new ServerError(res.status, res.statusText);
